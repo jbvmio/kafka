@@ -24,15 +24,8 @@ type KClient struct {
 }
 
 func NewClient(brokerList ...string) (*KClient, error) {
-	conf, err := GetConf()
-	if err != nil {
-		return nil, err
-	}
+	conf := GetConf()
 	client, err := getClient(conf, brokerList...)
-	if err != nil {
-		return nil, err
-	}
-	_, err = client.Controller() // Connectivity check
 	if err != nil {
 		return nil, err
 	}
@@ -46,17 +39,23 @@ func NewClient(brokerList ...string) (*KClient, error) {
 }
 
 func NewCustomClient(conf *sarama.Config, brokerList ...string) (*KClient, error) {
-	err := conf.Validate()
-	if err != nil {
-		return nil, err
-	}
-	client, err := getClient(conf, brokerList...)
-	if err != nil {
-		return nil, err
-	}
-	_, err = client.Controller() // Connectivity check
-	if err != nil {
-		return nil, err
+	var client sarama.Client
+	switch {
+	case conf == nil:
+		var err error
+		client, err = getClient(conf, brokerList...)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		err := conf.Validate()
+		if err != nil {
+			return nil, err
+		}
+		client, err = getClient(conf, brokerList...)
+		if err != nil {
+			return nil, err
+		}
 	}
 	kc := KClient{
 		cl:      client,
@@ -114,18 +113,26 @@ func (kc *KClient) Close() error {
 	return nil
 }
 
-func Logger(prefix string) {
-	if prefix == "" {
-		prefix = "[kafkactl] "
-	}
+// Logger Enables Verbose Logging in the logFormat given. Format is text by default. Valid option for now are either `json` or `text`.
+func Logger(logFormat ...string) {
+	var format string
 	logger := log.New()
 	logger.Out = os.Stdout
-	logger.Formatter = &log.TextFormatter{
-		TimestampFormat: defaultTimestampFormat,
-		FullTimestamp:   true,
+	if len(logFormat) > 0 {
+		format = logFormat[0]
+	}
+	switch {
+	case format == "json":
+		logger.Formatter = &log.JSONFormatter{
+			TimestampFormat: defaultTimestampFormat,
+		}
+	default:
+		logger.Formatter = &log.TextFormatter{
+			TimestampFormat: defaultTimestampFormat,
+			FullTimestamp:   true,
+		}
 	}
 	sarama.Logger = logger
-	//sarama.Logger = log.New(os.Stdout, prefix, log.LstdFlags)
 }
 
 func (kc *KClient) Logf(format string, v ...interface{}) {
@@ -141,13 +148,22 @@ func (kc *KClient) SaramaConfig() *sarama.Config {
 	return kc.config
 }
 
-func GetConf() (*sarama.Config, error) {
-	random := makeHex(3)
+// GetConf returns a *sarama.Config and optionally sets the ClientID if specified.
+// If entered, the ClientID is automatically postfixed with a random Hex value, ie: clientID-6f5ecf.
+// If a zero value string is entered (""), then a random Hex value will be set as the ClientID, ie: 6f5ecf.
+func GetConf(clientID ...string) *sarama.Config {
 	conf := sarama.NewConfig()
-	conf.ClientID = string("kafkactl" + "-" + random)
-	conf.Version = MinKafkaVersion
-	err := conf.Validate()
-	return conf, err
+	switch {
+	case len(clientID) == 0:
+		break
+	case clientID[0] == "":
+		random := makeHex(3)
+		conf.ClientID = string(random)
+	case len(clientID) > 0 && clientID[0] != "":
+		random := makeHex(3)
+		conf.ClientID = string(clientID[0] + "-" + random)
+	}
+	return conf
 }
 
 func getClient(conf *sarama.Config, brokers ...string) (sarama.Client, error) {
@@ -156,7 +172,7 @@ func getClient(conf *sarama.Config, brokers ...string) (sarama.Client, error) {
 
 // ReturnFirstValid returns the first available, connectable broker provided from a broker list
 func ReturnFirstValid(brokers ...string) (string, error) {
-	conf, _ := GetConf()
+	conf := GetConf()
 	for _, b := range brokers {
 		broker := sarama.NewBroker(b)
 		broker.Open(conf)
@@ -165,7 +181,7 @@ func ReturnFirstValid(brokers ...string) (string, error) {
 			return b, nil
 		}
 	}
-	return "", fmt.Errorf("Error: No Connectivity to Provided Brokers.")
+	return "", fmt.Errorf("No Connectivity to Provided Brokers")
 }
 
 func randomBytes(n int) []byte {

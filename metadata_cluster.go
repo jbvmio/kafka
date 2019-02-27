@@ -233,7 +233,7 @@ func (kc *KClient) apiVersions() (*sarama.ApiVersionsResponse, error) {
 
 func BrokerAPIVersions(broker string) (apiMaxVers map[int16]int16, err error) {
 	b := sarama.NewBroker(broker)
-	conf, err := GetConf()
+	conf := GetConf()
 	if err != nil {
 		return
 	}
