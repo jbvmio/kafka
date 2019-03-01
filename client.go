@@ -148,6 +148,9 @@ func validateLogger(logFormat ...string) {
 			configDefaultLogger()
 		}
 	case logging:
+		if logger == nil {
+			configDefaultLogger()
+		}
 		break
 	default:
 		configDefaultLogger()
