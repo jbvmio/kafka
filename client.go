@@ -179,16 +179,25 @@ func Warnf(format string, v ...interface{}) {
 
 func (kc *KClient) Logf(format string, v ...interface{}) {
 	validateLogger()
+	if kc.logger == nil {
+		kc.logger = logger
+	}
 	kc.logger.Printf(format, v...)
 }
 
 func (kc *KClient) Log(v ...interface{}) {
 	validateLogger()
+	if kc.logger == nil {
+		kc.logger = logger
+	}
 	kc.logger.Println(v...)
 }
 
 func (kc *KClient) Warnf(format string, v ...interface{}) {
 	validateLogger()
+	if kc.logger == nil {
+		kc.logger = logger
+	}
 	kc.logger.Warnf(format, v...)
 }
 
