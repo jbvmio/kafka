@@ -89,7 +89,7 @@ func (m *RawMetric) ConvertToMetric() *KafkaMetric {
 	case m.Type[histoMetricType]:
 		KM = &HistoMetric{
 			Measurement: m.Measurement,
-			Type:        meterMetricType,
+			Type:        histoMetricType,
 			Count:       m.Values[MetricCount].(int64),
 			Min:         m.Values[MetricMin].(int64),
 			Max:         m.Values[MetricMax].(int64),
@@ -198,6 +198,7 @@ func (m *HistoMetric) IsHisto() bool {
 	return m.Type == histoMetricType
 }
 
+// From Sarama GoDocs:
 const (
 	metricsReservoirSize = 1028
 	metricsAlphaFactor   = 0.015
