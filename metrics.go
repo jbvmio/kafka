@@ -26,25 +26,30 @@ type RawMetric struct {
 	Type        metricType
 }
 
+func (m *RawMetric) Update(r *metrics.Registry) {
+	all := *r
+	allMetrics := all.GetAll()
+	m.Values = allMetrics[m.Measurement]
+	m.getMetricType()
+}
+
 func (m *RawMetric) getMetricType() {
 	if m.Type == nil {
-		m.Type = make(map[string]bool, 1)
-	}
-	switch {
-	case m.Measurement == "" || m.Values == nil:
-		Warnf("metric not initialized!")
-		break
-	case m.Type[meterMetricType] || m.Type[histoMetricType]:
-		break
-	default:
-		for k := range m.Values {
-			switch {
-			case strings.Contains(k, "rate"):
-				m.Type = meterMetric
-				break
-			case !strings.Contains(k, "rate") && !strings.Contains(k, "count"):
-				m.Type = histoMetric
-				break
+		switch {
+		case m.Measurement == "" || m.Values == nil:
+			Warnf("metric not initialized!")
+			break
+		default:
+			m.Type = make(map[string]bool, 1)
+			for k := range m.Values {
+				switch {
+				case strings.Contains(k, "rate"):
+					m.Type = meterMetric
+					break
+				case !strings.Contains(k, "rate") && !strings.Contains(k, "count"):
+					m.Type = histoMetric
+					break
+				}
 			}
 		}
 	}
@@ -107,12 +112,6 @@ func (m *HistoMetric) IsMeter() bool {
 // IsHisto returns true if the metric type is a histogram.
 func (m *HistoMetric) IsHisto() bool {
 	return m.Type == histoMetricType
-}
-
-func (m *RawMetric) update(r *metrics.Registry) {
-	all := *r
-	allMetrics := all.GetAll()
-	m.Values = allMetrics[m.Measurement]
 }
 
 const (
