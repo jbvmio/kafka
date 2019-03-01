@@ -14,6 +14,22 @@ const (
 	histoMetricType = `histogram`
 )
 
+// Metric Measurement Names:
+const (
+	// Global Measurements
+	MetricCount = `count`
+	// Metere Measurements
+	MetricOneRate     = `1m.rate`
+	MetricFiveRate    = `5m.rate`
+	MetricFifteenRate = `15m.rate`
+	MetricMeanRate    = `mean.rate`
+	// Histogram Measurements
+	MetricMin         = `min`
+	MetricMax         = `max`
+	MetricSeventyFive = `75%`
+	MetricNinetyNine  = `99%`
+)
+
 type metricType map[string]bool
 
 var meterMetric = metricType{meterMetricType: true}
@@ -26,6 +42,7 @@ type RawMetric struct {
 	Type        metricType
 }
 
+// Update updates the RawMetric with current values from a metrics registry.
 func (m *RawMetric) Update(r *metrics.Registry) {
 	all := *r
 	allMetrics := all.GetAll()
@@ -55,6 +72,73 @@ func (m *RawMetric) getMetricType() {
 	}
 }
 
+// ConvertToMetric converts the RawMetric and returns a KafkaMetric.
+func (m *RawMetric) ConvertToMetric() *KafkaMetric {
+	var KM KafkaMetric
+	switch {
+	case m.Type[meterMetricType]:
+		KM = &MeterMetric{
+			Measurement: m.Measurement,
+			Type:        meterMetricType,
+			Count:       m.Values[MetricCount].(int64),
+			OneRate:     m.Values[MetricOneRate].(float64),
+			FiveRate:    m.Values[MetricFiveRate].(float64),
+			FifteenRate: m.Values[MetricFifteenRate].(float64),
+			MeanRate:    m.Values[MetricMeanRate].(float64),
+		}
+	case m.Type[histoMetricType]:
+		KM = &HistoMetric{
+			Measurement: m.Measurement,
+			Type:        meterMetricType,
+			Count:       m.Values[MetricCount].(int64),
+			Min:         m.Values[MetricMin].(int64),
+			Max:         m.Values[MetricMax].(int64),
+			SeventyFive: m.Values[MetricSeventyFive].(float64),
+			NinetyNine:  m.Values[MetricNinetyNine].(float64),
+		}
+	}
+	return &KM
+}
+
+// MetricCollection contains a collection of KafkaMetrics.
+type MetricCollection struct {
+	Meters     []MeterMetric
+	Histograms []HistoMetric
+}
+
+// MeterCount returns the number of meters currently in the collection.
+func (mc *MetricCollection) MeterCount() int {
+	return len(mc.Meters)
+}
+
+// HistoCount returns the number of meters currently in the collection.
+func (mc *MetricCollection) HistoCount() int {
+	return len(mc.Histograms)
+}
+
+// Add recieves a KafkaMetric and appends it to the appropriate collection type.
+func (mc *MetricCollection) Add(metrics ...KafkaMetric) {
+	for _, metric := range metrics {
+		switch {
+		case metric.IsMeter():
+			mc.Meters = append(mc.Meters, *metric.(*MeterMetric))
+		case metric.IsHisto():
+			mc.Histograms = append(mc.Histograms, *metric.(*HistoMetric))
+		}
+	}
+}
+
+// Add2 recieves a KafkaMetric and appends it to the appropriate collection type.
+func (mc *MetricCollection) Add2(metric *KafkaMetric) {
+	m := *metric
+	switch {
+	case m.IsMeter():
+		mc.Meters = append(mc.Meters, *m.(*MeterMetric))
+	case m.IsHisto():
+		mc.Histograms = append(mc.Histograms, *m.(*HistoMetric))
+	}
+}
+
 // KafkaMetric represents a metric measurement from Kafka.
 type KafkaMetric interface {
 	GetType() string
@@ -66,11 +150,11 @@ type KafkaMetric interface {
 type MeterMetric struct {
 	Measurement string
 	Type        string
-	Count       uint32
-	OneRate     float32
-	FiveRate    float32
-	FifteenRate float32
-	MeanRate    float32
+	Count       int64
+	OneRate     float64
+	FiveRate    float64
+	FifteenRate float64
+	MeanRate    float64
 }
 
 // GetType returns the metric type.
@@ -92,11 +176,11 @@ func (m *MeterMetric) IsHisto() bool {
 type HistoMetric struct {
 	Measurement string
 	Type        string
-	Count       uint32
-	Min         uint32
-	Max         uint32
-	SeventyFive float32
-	NinetyNine  float32
+	Count       int64
+	Min         int64
+	Max         int64
+	SeventyFive float64
+	NinetyNine  float64
 }
 
 // GetType returns the metric type.
