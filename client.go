@@ -13,7 +13,10 @@ import (
 
 const defaultTimestampFormat = time.RFC3339
 
-var logger *log.Logger
+var (
+	logger  *log.Logger
+	logging bool
+)
 
 type KClient struct {
 	apiVers map[int16]int16
@@ -119,41 +122,67 @@ func (kc *KClient) Close() error {
 
 // Logger Enables Verbose Logging in the logFormat given. Format is text by default. Valid option for now are either `json` or `text`.
 func Logger(logFormat ...string) {
-	var format string
-	logger = log.New()
-	logger.Out = os.Stdout
-	if len(logFormat) > 0 {
-		format = logFormat[0]
-	}
-	switch {
-	case format == "json":
-		logger.Formatter = &log.JSONFormatter{
-			TimestampFormat: defaultTimestampFormat,
-		}
-	default:
-		logger.Formatter = &log.TextFormatter{
-			TimestampFormat: defaultTimestampFormat,
-			FullTimestamp:   true,
-		}
-	}
+	validateLogger(logFormat...)
 	sarama.Logger = logger
 }
 
+func validateLogger(logFormat ...string) {
+	switch {
+	case !logging:
+		logger = log.New()
+		logger.Out = os.Stdout
+		switch {
+		case len(logFormat) > 0:
+			switch {
+			case logFormat[0] == "json":
+				logger.Formatter = &log.JSONFormatter{
+					TimestampFormat: defaultTimestampFormat,
+				}
+			default:
+				logger.Formatter = &log.TextFormatter{
+					TimestampFormat: defaultTimestampFormat,
+					FullTimestamp:   true,
+				}
+			}
+		default:
+			logger.Formatter = &log.TextFormatter{
+				TimestampFormat: defaultTimestampFormat,
+				FullTimestamp:   true,
+			}
+		}
+		logging = true
+	case len(logFormat) > 0:
+		switch {
+		case logFormat[0] == "json":
+			logger.Formatter = &log.JSONFormatter{
+				TimestampFormat: defaultTimestampFormat,
+			}
+		default:
+			logger.Formatter = &log.TextFormatter{
+				TimestampFormat: defaultTimestampFormat,
+				FullTimestamp:   true,
+			}
+		}
+	}
+}
+
 func Warnf(format string, v ...interface{}) {
+	validateLogger()
 	logger.Warnf(format, v...)
 }
 
 func (kc *KClient) Logf(format string, v ...interface{}) {
-	//sarama.Logger.Printf(format, v...)
+	validateLogger()
 	kc.logger.Printf(format, v...)
 }
 
 func (kc *KClient) Log(v ...interface{}) {
-	//sarama.Logger.Println(v...)
+	validateLogger()
 	kc.logger.Println(v...)
 }
 
 func (kc *KClient) Warnf(format string, v ...interface{}) {
+	validateLogger()
 	kc.logger.Warnf(format, v...)
 }
 
