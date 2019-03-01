@@ -123,47 +123,49 @@ func (kc *KClient) Close() error {
 // Logger Enables Verbose Logging in the logFormat given. Format is text by default. Valid option for now are either `json` or `text`.
 func Logger(logFormat ...string) {
 	validateLogger(logFormat...)
-	sarama.Logger = logger
 }
 
 func validateLogger(logFormat ...string) {
 	switch {
 	case !logging:
-		logger = log.New()
-		logger.Out = os.Stdout
 		switch {
 		case len(logFormat) > 0:
 			switch {
 			case logFormat[0] == "json":
-				logger.Formatter = &log.JSONFormatter{
-					TimestampFormat: defaultTimestampFormat,
-				}
+				configJSONLogger()
 			default:
-				logger.Formatter = &log.TextFormatter{
-					TimestampFormat: defaultTimestampFormat,
-					FullTimestamp:   true,
-				}
+				configDefaultLogger()
 			}
 		default:
-			logger.Formatter = &log.TextFormatter{
-				TimestampFormat: defaultTimestampFormat,
-				FullTimestamp:   true,
-			}
+			configDefaultLogger()
 		}
-		logging = true
 	case len(logFormat) > 0:
 		switch {
 		case logFormat[0] == "json":
-			logger.Formatter = &log.JSONFormatter{
-				TimestampFormat: defaultTimestampFormat,
-			}
-		default:
-			logger.Formatter = &log.TextFormatter{
-				TimestampFormat: defaultTimestampFormat,
-				FullTimestamp:   true,
-			}
+			configJSONLogger()
 		}
 	}
+}
+
+func configDefaultLogger() {
+	logger = log.New()
+	logger.Out = os.Stdout
+	logger.Formatter = &log.TextFormatter{
+		TimestampFormat: defaultTimestampFormat,
+		FullTimestamp:   true,
+	}
+	logging = true
+	sarama.Logger = logger
+}
+
+func configJSONLogger() {
+	logger = log.New()
+	logger.Out = os.Stdout
+	logger.Formatter = &log.JSONFormatter{
+		TimestampFormat: defaultTimestampFormat,
+	}
+	logging = true
+	sarama.Logger = logger
 }
 
 func Warnf(format string, v ...interface{}) {
