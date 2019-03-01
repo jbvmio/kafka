@@ -122,6 +122,7 @@ func (kc *KClient) Close() error {
 
 // Logger Enables Verbose Logging in the logFormat given. Format is text by default. Valid option for now are either `json` or `text`.
 func Logger(logFormat ...string) {
+	logging = true
 	validateLogger(logFormat...)
 }
 
@@ -158,8 +159,9 @@ func configDefaultLogger() {
 		TimestampFormat: defaultTimestampFormat,
 		FullTimestamp:   true,
 	}
-	logging = true
-	sarama.Logger = logger
+	if logging {
+		sarama.Logger = logger
+	}
 }
 
 func configJSONLogger() {
@@ -168,8 +170,9 @@ func configJSONLogger() {
 	logger.Formatter = &log.JSONFormatter{
 		TimestampFormat: defaultTimestampFormat,
 	}
-	logging = true
-	sarama.Logger = logger
+	if logging {
+		sarama.Logger = logger
+	}
 }
 
 func Warnf(format string, v ...interface{}) {
