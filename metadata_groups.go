@@ -187,10 +187,9 @@ func (kc *KClient) GetGroupMeta() ([]GroupMeta, error) {
 			if err != nil {
 				if err.Error() != `kafka: insufficient data to decode packet, more bytes expected` {
 					return groupMeta, err
-				} else {
-					memberMeta.Active = false
-					group.MemberAssignments = append(group.MemberAssignments, memberMeta)
 				}
+				memberMeta.Active = false
+				group.MemberAssignments = append(group.MemberAssignments, memberMeta)
 			}
 			if memberMeta.Active {
 				memberMeta.TopicPartitions = assign.Topics

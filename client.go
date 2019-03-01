@@ -13,6 +13,8 @@ import (
 
 const defaultTimestampFormat = time.RFC3339
 
+var logger *log.Logger
+
 type KClient struct {
 	apiVers map[int16]int16
 	brokers []*sarama.Broker
@@ -33,6 +35,7 @@ func NewClient(brokerList ...string) (*KClient, error) {
 		cl:      client,
 		config:  conf,
 		brokers: client.Brokers(),
+		logger:  logger,
 	}
 	kc.Connect()
 	return &kc, nil
@@ -61,6 +64,7 @@ func NewCustomClient(conf *sarama.Config, brokerList ...string) (*KClient, error
 		cl:      client,
 		config:  conf,
 		brokers: client.Brokers(),
+		logger:  logger,
 	}
 	kc.Connect()
 	return &kc, nil
@@ -116,7 +120,7 @@ func (kc *KClient) Close() error {
 // Logger Enables Verbose Logging in the logFormat given. Format is text by default. Valid option for now are either `json` or `text`.
 func Logger(logFormat ...string) {
 	var format string
-	logger := log.New()
+	logger = log.New()
 	logger.Out = os.Stdout
 	if len(logFormat) > 0 {
 		format = logFormat[0]
@@ -135,12 +139,22 @@ func Logger(logFormat ...string) {
 	sarama.Logger = logger
 }
 
+func Warnf(format string, v ...interface{}) {
+	logger.Warnf(format, v...)
+}
+
 func (kc *KClient) Logf(format string, v ...interface{}) {
-	sarama.Logger.Printf(format, v...)
+	//sarama.Logger.Printf(format, v...)
+	kc.logger.Printf(format, v...)
 }
 
 func (kc *KClient) Log(v ...interface{}) {
-	sarama.Logger.Println(v...)
+	//sarama.Logger.Println(v...)
+	kc.logger.Println(v...)
+}
+
+func (kc *KClient) Warnf(format string, v ...interface{}) {
+	kc.logger.Warnf(format, v...)
 }
 
 // SaramaConfig returns and allows modification of the underlying sarama client config
