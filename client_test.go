@@ -41,6 +41,26 @@ func TestCustomClient(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestLogging(t *testing.T) {
+	Warnf("Test Logging Validation")
+}
+
+func TestClientLogging(t *testing.T) {
+	seedBroker := sarama.NewMockBroker(t, 1)
+	metaResponse := new(sarama.MetadataResponse)
+	seedBroker.Returns(metaResponse)
+	client, err := NewClient(seedBroker.Addr())
+	if err != nil {
+		t.Fatal(err)
+	}
+	client.Log("Test Client Logging Validation")
+	err = client.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedBroker.Close()
+}
+
 func TestClusterMetaRequest(t *testing.T) {
 	clientTimeout := (time.Second * 5)
 	clientRetries := 1
