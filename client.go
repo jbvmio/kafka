@@ -29,7 +29,7 @@ type KClient struct {
 }
 
 func NewClient(brokerList ...string) (*KClient, error) {
-	conf := GetConf()
+	conf := GetConf("")
 	client, err := getClient(conf, brokerList...)
 	if err != nil {
 		return nil, err
