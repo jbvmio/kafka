@@ -144,6 +144,10 @@ func validateLogger(logFormat ...string) {
 		case logFormat[0] == "json":
 			configJSONLogger()
 		}
+	case logging:
+		break
+	default:
+		configDefaultLogger()
 	}
 }
 
