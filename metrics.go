@@ -116,19 +116,14 @@ func (mc *MetricCollection) HistoCount() int {
 	return len(mc.Histograms)
 }
 
-// Add2 recieves a KafkaMetric and appends it to the appropriate collection type.
-func (mc *MetricCollection) Add2(metrics ...KafkaMetric) {
-	for _, metric := range metrics {
-		switch {
-		case metric.IsMeter():
-			mc.Meters = append(mc.Meters, *metric.(*MeterMetric))
-		case metric.IsHisto():
-			mc.Histograms = append(mc.Histograms, *metric.(*HistoMetric))
-		}
+// AddFromRaw recieves a single or collection of RawMetric types and appends to its appropriate collection type.
+func (mc *MetricCollection) AddFromRaw(rawMetrics ...*RawMetric) {
+	for _, raw := range rawMetrics {
+		mc.Add(raw.ConvertToMetric())
 	}
 }
 
-// Add recieves a KafkaMetric and appends it to the appropriate collection type.
+// Add recieves a KafkaMetric and appends it to its appropriate collection type.
 func (mc *MetricCollection) Add(metrics ...*KafkaMetric) {
 	for _, metric := range metrics {
 		m := *metric
