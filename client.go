@@ -180,11 +180,25 @@ func configJSONLogger() {
 	}
 }
 
+// Log allows use of the same logger without having to initialize a client.
+func Log(format string, v ...interface{}) {
+	validateLogger()
+	logger.Println(v...)
+}
+
+// Logf allows use of the same logger without having to initialize a client.
+func Logf(format string, v ...interface{}) {
+	validateLogger()
+	logger.Printf(format, v...)
+}
+
+// Warnf allows use of the same logger without having to initialize a client.
 func Warnf(format string, v ...interface{}) {
 	validateLogger()
 	logger.Warnf(format, v...)
 }
 
+// Logf uses the internal logger to log messages.
 func (kc *KClient) Logf(format string, v ...interface{}) {
 	validateLogger()
 	if kc.logger == nil {
@@ -193,6 +207,7 @@ func (kc *KClient) Logf(format string, v ...interface{}) {
 	kc.logger.Printf(format, v...)
 }
 
+// Log uses the internal logger to log messages.
 func (kc *KClient) Log(v ...interface{}) {
 	validateLogger()
 	if kc.logger == nil {
@@ -201,6 +216,7 @@ func (kc *KClient) Log(v ...interface{}) {
 	kc.logger.Println(v...)
 }
 
+// Warnf uses the internal logger to log messages.
 func (kc *KClient) Warnf(format string, v ...interface{}) {
 	validateLogger()
 	if kc.logger == nil {

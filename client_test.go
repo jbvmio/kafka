@@ -42,7 +42,10 @@ func TestCustomClient(t *testing.T) {
 }
 
 func TestLogging(t *testing.T) {
-	Warnf("Test Logging Validation")
+	m := `testmessage`
+	Log("Log Logging Validation:", m)
+	Logf("Logf Logging Validation: %v\n", m)
+	Warnf("Warnf Logging Validation: %v\n", m)
 }
 
 func TestClientLogging(t *testing.T) {
@@ -53,7 +56,10 @@ func TestClientLogging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client.Log("Test Client Logging Validation")
+	m := `testmessage`
+	client.Log("Log Logging Validation:", m)
+	client.Logf("Logf Logging Validation: %v\n", m)
+	client.Warnf("Warnf Logging Validation: %v\n", m)
 	err = client.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -64,16 +70,21 @@ func TestClientLogging(t *testing.T) {
 func TestClusterMetaRequest(t *testing.T) {
 	clientTimeout := (time.Second * 5)
 	clientRetries := 1
-	seedBroker := sarama.NewMockBroker(t, 1)
+	seedBroker, controllerBroker := getTestingBrokers(t)
+	//seedBroker := sarama.NewMockBroker(t, 1)
 	defer seedBroker.Close()
-	controllerBroker := sarama.NewMockBroker(t, 2)
+	//controllerBroker := sarama.NewMockBroker(t, 2)
 	defer controllerBroker.Close()
-	seedBroker.SetHandlerByMap(map[string]sarama.MockResponse{
-		"MetadataRequest": sarama.NewMockMetadataResponse(t).
-			SetController(controllerBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
-			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
-	})
+
+	/*
+		seedBroker.SetHandlerByMap(map[string]sarama.MockResponse{
+			"MetadataRequest": sarama.NewMockMetadataResponse(t).
+				SetController(controllerBroker.BrokerID()).
+				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+				SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
+		})
+	*/
+
 	conf := GetConf()
 	conf.Net.DialTimeout = clientTimeout
 	conf.Net.ReadTimeout = clientTimeout
@@ -123,4 +134,18 @@ func (kc *KClient) clusterMetaTest() (ClusterMeta, error) {
 	sort.Strings(cm.Brokers)
 	sort.Strings(cm.Topics)
 	return cm, nil
+}
+
+func getTestingBrokers(t *testing.T) (seedBroker, controllerBroker *sarama.MockBroker) {
+	seedBroker = sarama.NewMockBroker(t, 1)
+	controllerBroker = sarama.NewMockBroker(t, 2)
+	seedBroker.SetHandlerByMap(map[string]sarama.MockResponse{
+		"MetadataRequest": sarama.NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetLeader("testTopic", 0, seedBroker.BrokerID()).
+			SetLeader("testTopic", 1, controllerBroker.BrokerID()),
+	})
+	return
 }
