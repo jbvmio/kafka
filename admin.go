@@ -1,7 +1,10 @@
 package kafka
 
 import (
+	"errors"
 	"fmt"
+	"math/rand"
+	"sync"
 
 	"github.com/Shopify/sarama"
 )
@@ -11,6 +14,7 @@ type clusterAdmin struct {
 	conf   *sarama.Config
 }
 
+// Admin contructs and returns an underlying Cluster Admin struct.
 func (kc *KClient) Admin() sarama.ClusterAdmin {
 	return &clusterAdmin{
 		client: kc.cl,
@@ -110,6 +114,88 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 	return nil
 }
 
+func (ca *clusterAdmin) findAnyBroker() (*sarama.Broker, error) {
+	brokers := ca.client.Brokers()
+	if len(brokers) > 0 {
+		index := rand.Intn(len(brokers))
+		return brokers[index], nil
+	}
+	return nil, errors.New("no available broker")
+}
+
+// ListTopics returns topic-details mapping. (Needs WiP*)
+func (ca *clusterAdmin) ListTopics() (map[string]sarama.TopicDetail, error) {
+	// In order to build TopicDetails we need to first get the list of all
+	// topics using a MetadataRequest and then get their configs using a
+	// DescribeConfigsRequest request. To avoid sending many requests to the
+	// broker, we use a single DescribeConfigsRequest.
+
+	// Send the all-topic MetadataRequest
+	b, err := ca.findAnyBroker()
+	if err != nil {
+		return nil, err
+	}
+	_ = b.Open(ca.client.Config())
+
+	metadataReq := &sarama.MetadataRequest{}
+	metadataResp, err := b.GetMetadata(metadataReq)
+	if err != nil {
+		return nil, err
+	}
+
+	topicsDetailsMap := make(map[string]sarama.TopicDetail)
+
+	var describeConfigsResources []*sarama.ConfigResource
+
+	for _, topic := range metadataResp.Topics {
+		topicDetails := sarama.TopicDetail{
+			NumPartitions: int32(len(topic.Partitions)),
+		}
+		if len(topic.Partitions) > 0 {
+			topicDetails.ReplicaAssignment = map[int32][]int32{}
+			for _, partition := range topic.Partitions {
+				topicDetails.ReplicaAssignment[partition.ID] = partition.Replicas
+			}
+			topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas))
+		}
+		topicsDetailsMap[topic.Name] = topicDetails
+
+		// we populate the resources we want to describe from the MetadataResponse
+		topicResource := sarama.ConfigResource{
+			Type: sarama.TopicResource,
+			Name: topic.Name,
+		}
+		describeConfigsResources = append(describeConfigsResources, &topicResource)
+	}
+
+	// Send the DescribeConfigsRequest
+	describeConfigsReq := &sarama.DescribeConfigsRequest{
+		Resources: describeConfigsResources,
+	}
+	describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, resource := range describeConfigsResp.Resources {
+		topicDetails := topicsDetailsMap[resource.Name]
+		topicDetails.ConfigEntries = make(map[string]*string)
+
+		for _, entry := range resource.Configs {
+			// only include non-default non-sensitive config
+			// (don't actually think topic config will ever be sensitive)
+			if entry.Default || entry.Sensitive {
+				continue
+			}
+			topicDetails.ConfigEntries[entry.Name] = &entry.Value
+		}
+
+		topicsDetailsMap[resource.Name] = topicDetails
+	}
+
+	return topicsDetailsMap, nil
+}
+
 func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [][]int32, validateOnly bool) error {
 	if topic == "" {
 		return sarama.ErrInvalidTopic
@@ -198,6 +284,28 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*sarama.Broker, controllerI
 	return response.Brokers, response.ControllerID, nil
 }
 
+func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*sarama.TopicMetadata, err error) {
+	controller, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	request := &sarama.MetadataRequest{
+		Topics:                 topics,
+		AllowAutoTopicCreation: false,
+	}
+
+	if ca.conf.Version.IsAtLeast(sarama.V0_11_0_0) {
+		request.Version = 4
+	}
+
+	response, err := controller.GetMetadata(request)
+	if err != nil {
+		return nil, err
+	}
+	return response.Topics, nil
+}
+
 func (ca *clusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama.ConfigEntry, error) {
 
 	var entries []sarama.ConfigEntry
@@ -221,7 +329,6 @@ func (ca *clusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama
 	for _, rspResource := range rsp.Resources {
 		if rspResource.Name == resource.Name {
 			if rspResource.ErrorMsg != "" {
-				//return nil, errors.New(rspResource.ErrorMsg)
 				return nil, fmt.Errorf("%v", rspResource.ErrorMsg)
 			}
 			for _, cfgEntry := range rspResource.Configs {
@@ -259,7 +366,6 @@ func (ca *clusterAdmin) AlterConfig(resourceType sarama.ConfigResourceType, name
 	for _, rspResource := range rsp.Resources {
 		if rspResource.Name == name {
 			if rspResource.ErrorMsg != "" {
-				//return errors.New(rspResource.ErrorMsg)
 				return fmt.Errorf(rspResource.ErrorMsg)
 			}
 		}
@@ -325,4 +431,96 @@ func (ca *clusterAdmin) DeleteACL(filter sarama.AclFilter, validateOnly bool) ([
 
 	}
 	return mAcls, nil
+}
+
+// DescribeConsumerGroups returns consumer group details. (Needs WiP*)
+func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*sarama.GroupDescription, err error) {
+	groupsPerBroker := make(map[*sarama.Broker][]string)
+
+	for _, group := range groups {
+		controller, err := ca.client.Coordinator(group)
+		if err != nil {
+			return nil, err
+		}
+		groupsPerBroker[controller] = append(groupsPerBroker[controller], group)
+
+	}
+
+	for broker, brokerGroups := range groupsPerBroker {
+		response, err := broker.DescribeGroups(&sarama.DescribeGroupsRequest{
+			Groups: brokerGroups,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, response.Groups...)
+	}
+	return result, nil
+}
+
+// ListConsumerGroups returns a group-protocol mapping. (Needs WiP*)
+func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err error) {
+	allGroups = make(map[string]string)
+
+	// Query brokers in parallel, since we have to query *all* brokers
+	brokers := ca.client.Brokers()
+	groupMaps := make(chan map[string]string, len(brokers))
+	errors := make(chan error, len(brokers))
+	wg := sync.WaitGroup{}
+
+	for _, b := range brokers {
+		wg.Add(1)
+		go func(b *sarama.Broker, conf *sarama.Config) {
+			defer wg.Done()
+			_ = b.Open(conf) // Ensure that broker is opened
+
+			response, err := b.ListGroups(&sarama.ListGroupsRequest{})
+			if err != nil {
+				errors <- err
+				return
+			}
+
+			groups := make(map[string]string)
+			for group, typ := range response.Groups {
+				groups[group] = typ
+			}
+
+			groupMaps <- groups
+
+		}(b, ca.conf)
+	}
+
+	wg.Wait()
+	close(groupMaps)
+	close(errors)
+
+	for groupMap := range groupMaps {
+		for group, protocolType := range groupMap {
+			allGroups[group] = protocolType
+		}
+	}
+
+	// Intentionally return only the first error for simplicity
+	err = <-errors
+	return
+}
+
+// ListConsumerGroupOffsets returns group offsets for the given topic-partition map. (Needs WiP*)
+func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*sarama.OffsetFetchResponse, error) {
+	coordinator, err := ca.client.Coordinator(group)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &sarama.OffsetFetchRequest{
+		ConsumerGroup: group,
+		//partitions:    topicPartitions,
+	}
+
+	if ca.conf.Version.IsAtLeast(sarama.V0_8_2_2) {
+		request.Version = 1
+	}
+
+	return coordinator.FetchOffset(request)
 }
