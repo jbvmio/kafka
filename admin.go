@@ -179,6 +179,25 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	return nil
 }
 
+// DescribeCluster retrieves information about the nodes in the cluster.
+func (ca *clusterAdmin) DescribeCluster() (brokers []*sarama.Broker, controllerID int32, err error) {
+	controller, err := ca.Controller()
+	if err != nil {
+		return nil, int32(0), err
+	}
+
+	request := &sarama.MetadataRequest{
+		Topics: []string{},
+	}
+
+	response, err := controller.GetMetadata(request)
+	if err != nil {
+		return nil, int32(0), err
+	}
+
+	return response.Brokers, response.ControllerID, nil
+}
+
 func (ca *clusterAdmin) DescribeConfig(resource sarama.ConfigResource) ([]sarama.ConfigEntry, error) {
 
 	var entries []sarama.ConfigEntry
