@@ -71,20 +71,8 @@ func TestClusterMetaRequest(t *testing.T) {
 	clientTimeout := (time.Second * 5)
 	clientRetries := 1
 	seedBroker, controllerBroker := getTestingBrokers(t)
-	//seedBroker := sarama.NewMockBroker(t, 1)
 	defer seedBroker.Close()
-	//controllerBroker := sarama.NewMockBroker(t, 2)
 	defer controllerBroker.Close()
-
-	/*
-		seedBroker.SetHandlerByMap(map[string]sarama.MockResponse{
-			"MetadataRequest": sarama.NewMockMetadataResponse(t).
-				SetController(controllerBroker.BrokerID()).
-				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
-				SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
-		})
-	*/
-
 	conf := GetConf()
 	conf.Net.DialTimeout = clientTimeout
 	conf.Net.ReadTimeout = clientTimeout
@@ -102,6 +90,7 @@ func TestClusterMetaRequest(t *testing.T) {
 	if cm.BrokerCount() != 2 {
 		t.Error("Client returned incorrect number of available brokers, expected 2, received:", cm.BrokerCount())
 	}
+	client.Logf("Found %v Brokers, %v Topics, %v Groups", cm.BrokerCount(), cm.TopicCount(), cm.GroupCount())
 	err = client.Close()
 	if err != nil {
 		t.Fatal(err)
@@ -136,6 +125,18 @@ func (kc *KClient) clusterMetaTest() (ClusterMeta, error) {
 	return cm, nil
 }
 
+func getTestingClient(seedBroker *sarama.MockBroker) (*KClient, error) {
+	clientTimeout := (time.Second * 5)
+	clientRetries := 1
+	conf := GetConf()
+	conf.Net.DialTimeout = clientTimeout
+	conf.Net.ReadTimeout = clientTimeout
+	conf.Net.WriteTimeout = clientTimeout
+	conf.Metadata.Retry.Max = clientRetries
+	conf.Version = MinKafkaVersion
+	return NewCustomClient(conf, seedBroker.Addr())
+}
+
 func getTestingBrokers(t *testing.T) (seedBroker, controllerBroker *sarama.MockBroker) {
 	seedBroker = sarama.NewMockBroker(t, 1)
 	controllerBroker = sarama.NewMockBroker(t, 2)
@@ -149,3 +150,24 @@ func getTestingBrokers(t *testing.T) (seedBroker, controllerBroker *sarama.MockB
 	})
 	return
 }
+
+/*
+func getTestingBrokers(t *testing.T) (seedBroker, controllerBroker *sarama.MockBroker) {
+	seedBroker = sarama.NewMockBroker(t, 1)
+	controllerBroker = sarama.NewMockBroker(t, 2)
+	seedBroker.SetHandlerByMap(map[string]sarama.MockResponse{
+		"MetadataRequest": sarama.NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetLeader("testTopic", 0, seedBroker.BrokerID()).
+			SetLeader("testTopic", 1, controllerBroker.BrokerID()),
+		"DescribeGroupsRequest": sarama.NewMockDescribeGroupsResponse(t).
+			AddGroupDescription("testGroup", sarama.GroupDescription{
+				Err:     nil,
+				GroupID: "testGroup",
+			}),
+	})
+	return
+}
+*/

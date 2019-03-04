@@ -110,7 +110,6 @@ func startDEBUG(cg *ConsumerGroup) {
 			d.Current = note.Current
 			d.HasData = true
 			d.IsNote = true
-			//fmt.Printf("%+v\n", d)
 			cg.debugChan <- &d
 			cg.haveDebugChan <- true
 		case err, ok := <-cg.consumer.Errors():

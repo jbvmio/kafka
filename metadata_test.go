@@ -2,39 +2,16 @@ package kafka
 
 import (
 	"testing"
-	"time"
 )
 
 func TestGetTopicMetadata(t *testing.T) {
-	clientTimeout := (time.Second * 5)
-	clientRetries := 1
-	//seedBroker := sarama.NewMockBroker(t, 1)
-	//leader := sarama.NewMockBroker(t, 5)
 	seedBroker, controllerBroker := getTestingBrokers(t)
 	defer seedBroker.Close()
 	defer controllerBroker.Close()
-
-	/*
-		replicas := []int32{3, 1, 5}
-		isr := []int32{5, 1}
-		metadataResponse := new(sarama.MetadataResponse)
-		metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-		metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), replicas, isr, sarama.ErrNoError)
-		metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, sarama.ErrLeaderNotAvailable)
-		seedBroker.Returns(metadataResponse)
-	*/
-
-	conf := GetConf()
-	conf.Net.DialTimeout = clientTimeout
-	conf.Net.ReadTimeout = clientTimeout
-	conf.Net.WriteTimeout = clientTimeout
-	conf.Metadata.Retry.Max = clientRetries
-	conf.Version = MinKafkaVersion
-	client, err := NewCustomClient(conf, seedBroker.Addr())
+	client, err := getTestingClient(seedBroker)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	tm, err := client.GetTopicMeta()
 	if err != nil {
 		t.Fatal(err)
