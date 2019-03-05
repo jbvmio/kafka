@@ -237,6 +237,7 @@ func (kc *KClient) apiVersions() (*sarama.ApiVersionsResponse, error) {
 func BrokerAPIVersions(broker string) (apiMaxVers map[int16]int16, err error) {
 	b := sarama.NewBroker(broker)
 	conf := GetConf()
+	conf.ClientID = makeHex(3)
 	conf.Version = RecKafkaVersion
 	b.Open(conf)
 	apiReq := sarama.ApiVersionsRequest{}
@@ -251,6 +252,7 @@ func BrokerAPIVersions(broker string) (apiMaxVers map[int16]int16, err error) {
 	return
 }
 
+// MatchKafkaVersion parses the given versiona and returns the corresponding KafkaVersion from sarama.
 func MatchKafkaVersion(version string) (sarama.KafkaVersion, error) {
 	return sarama.ParseKafkaVersion(version)
 }
