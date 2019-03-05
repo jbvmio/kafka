@@ -237,7 +237,7 @@ func (kc *KClient) apiVersions() (*sarama.ApiVersionsResponse, error) {
 func BrokerAPIVersions(broker string) (apiMaxVers map[int16]int16, err error) {
 	b := sarama.NewBroker(broker)
 	conf := GetConf()
-	conf.Version = MinKafkaVersion
+	conf.Version = RecKafkaVersion
 	b.Open(conf)
 	apiReq := sarama.ApiVersionsRequest{}
 	apiVers, err := b.ApiVersions(&apiReq)
