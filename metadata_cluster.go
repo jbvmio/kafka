@@ -199,7 +199,9 @@ var APIDescriptions = map[int16]string{
 }
 
 var (
-	MinKafkaVersion     = sarama.V1_1_0_0
+	MinKafkaVersion     = sarama.MinVersion
+	MaxKafkaVersion     = sarama.MaxVersion
+	RecKafkaVersion     = sarama.V1_1_0_0
 	MinCreatePartsVer   = sarama.V1_0_0_0
 	MinDeleteRecordsVer = sarama.V0_11_0_0
 	MinTopicOpsVer      = sarama.V0_10_1_0
@@ -234,7 +236,9 @@ func (kc *KClient) apiVersions() (*sarama.ApiVersionsResponse, error) {
 // BrokerAPIVersions returns the available API Versions for the given broker.
 func BrokerAPIVersions(broker string) (apiMaxVers map[int16]int16, err error) {
 	b := sarama.NewBroker(broker)
-	b.Open(nil)
+	conf := GetConf()
+	conf.Version = MinKafkaVersion
+	b.Open(conf)
 	apiReq := sarama.ApiVersionsRequest{}
 	apiVers, err := b.ApiVersions(&apiReq)
 	if err != nil {
