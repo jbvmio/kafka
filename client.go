@@ -254,10 +254,11 @@ func getClient(conf *sarama.Config, brokers ...string) (sarama.Client, error) {
 
 // ReturnFirstValid returns the first available, connectable broker provided from a broker list
 func ReturnFirstValid(brokers ...string) (string, error) {
-	//conf := GetConf()
+	conf := GetConf()
+	conf.ClientID = makeHex(3)
 	for _, b := range brokers {
 		broker := sarama.NewBroker(b)
-		broker.Open(nil)
+		broker.Open(conf)
 		ok, _ := broker.Connected()
 		if ok {
 			return b, nil
