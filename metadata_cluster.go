@@ -231,13 +231,10 @@ func (kc *KClient) apiVersions() (*sarama.ApiVersionsResponse, error) {
 	return apiRes, nil
 }
 
+// BrokerAPIVersions returns the available API Versions for the given broker.
 func BrokerAPIVersions(broker string) (apiMaxVers map[int16]int16, err error) {
 	b := sarama.NewBroker(broker)
-	conf := GetConf()
-	if err != nil {
-		return
-	}
-	b.Open(conf)
+	b.Open(nil)
 	apiReq := sarama.ApiVersionsRequest{}
 	apiVers, err := b.ApiVersions(&apiReq)
 	if err != nil {
