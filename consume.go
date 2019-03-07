@@ -61,6 +61,29 @@ func (kc *KClient) ConsumeOffsetMsg(topic string, partition int32, offset int64)
 	return
 }
 
+// GetOffsetMsg retreives a single message from the given topic, partition and literal offset without converstion.
+func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (message *Message, err error) {
+	consumer, err := sarama.NewConsumerFromClient(kc.cl)
+	if err != nil {
+		return
+	}
+	partitionConsumer, err := consumer.ConsumePartition(topic, partition, offset)
+	if err != nil {
+		return
+	}
+	msg := <-partitionConsumer.Messages()
+	message = convertMsg(msg)
+	err = partitionConsumer.Close()
+	if err != nil {
+		return
+	}
+	err = consumer.Close()
+	if err != nil {
+		return
+	}
+	return
+}
+
 // ChanPartitionConsume retreives messages from the given topic, partition and literal offset.
 // Meant to be used via a goroutine, a Message channel and bool channel (for stopping the process) should be passed.
 // Will return an error through the msgChan if any are encountered before initializing the Consume Loop.
