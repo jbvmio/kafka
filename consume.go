@@ -62,7 +62,7 @@ func (kc *KClient) ConsumeOffsetMsg(topic string, partition int32, offset int64)
 }
 
 // GetOffsetMsg retreives a single message from the given topic, partition and literal offset without converstion.
-func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (message *Message, err error) {
+func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (message *sarama.ConsumerMessage, err error) {
 	consumer, err := sarama.NewConsumerFromClient(kc.cl)
 	if err != nil {
 		return
@@ -71,8 +71,7 @@ func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (me
 	if err != nil {
 		return
 	}
-	msg := <-partitionConsumer.Messages()
-	message = convertMsg(msg)
+	message = <-partitionConsumer.Messages()
 	err = partitionConsumer.Close()
 	if err != nil {
 		return
