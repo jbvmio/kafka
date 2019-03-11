@@ -173,24 +173,27 @@ func GetTopicSummaries(topicMeta []TopicMeta) []TopicSummary {
 	return topicSummary
 }
 
+// GetTopicMeta returns metadata for all topics.
 func (kc *KClient) GetTopicMeta() ([]TopicMeta, error) {
 	var topicMeta []TopicMeta
 	res, err := kc.ReqMetadata()
 	if err != nil {
 		return topicMeta, err
 	}
-	for _, t := range res.Topics {
-		topicName := t.Name
-		for _, x := range t.Partitions {
-			tm := TopicMeta{
-				Topic:           topicName,
-				Partition:       x.ID,
-				Leader:          x.Leader,
-				Replicas:        x.Replicas,
-				ISRs:            x.Isr,
-				OfflineReplicas: x.OfflineReplicas,
+	if res.Topics != nil {
+		for _, t := range res.Topics {
+			topicName := t.Name
+			for _, x := range t.Partitions {
+				tm := TopicMeta{
+					Topic:           topicName,
+					Partition:       x.ID,
+					Leader:          x.Leader,
+					Replicas:        x.Replicas,
+					ISRs:            x.Isr,
+					OfflineReplicas: x.OfflineReplicas,
+				}
+				topicMeta = append(topicMeta, tm)
 			}
-			topicMeta = append(topicMeta, tm)
 		}
 	}
 	return topicMeta, err
