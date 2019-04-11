@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/Shopify/sarama"
@@ -58,6 +59,9 @@ func (kc *KClient) GetClusterMeta() (ClusterMeta, error) {
 	res, err := kc.ReqMetadata()
 	if err != nil {
 		return cm, err
+	}
+	if res == nil {
+		return cm, fmt.Errorf("No Metadata Response Received")
 	}
 	grps, errs := kc.ListGroups()
 	if len(errs) > 0 {
