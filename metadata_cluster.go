@@ -60,9 +60,6 @@ func (kc *KClient) GetClusterMeta() (ClusterMeta, error) {
 	if err != nil {
 		return cm, err
 	}
-	if res == nil {
-		return cm, fmt.Errorf("No Metadata Response Received")
-	}
 	grps, errs := kc.ListGroups()
 	if len(errs) > 0 {
 		cm.ErrorStack = append(cm.ErrorStack, errs...)
@@ -105,7 +102,7 @@ func (kc *KClient) ReqMetadata() (*sarama.MetadataResponse, error) {
 			return res, nil
 		}
 	}
-	return res, err
+	return nil, fmt.Errorf("No Metadata Response Received")
 }
 
 // APIKey Codes
