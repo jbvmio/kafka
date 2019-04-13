@@ -108,26 +108,28 @@ ConsumeLoop:
 	for {
 		select {
 		case <-kc.stopChan:
+			if err := partitionConsumer.Close(); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			if err := consumer.Close(); err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
 			break ConsumeLoop
 		case msg := <-partitionConsumer.Messages():
 			msgChan <- convertMsg(msg)
 		}
-	}
-	if err := partitionConsumer.Close(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	if err := consumer.Close(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
 	}
 }
 
 // StopPartitionConsumers signals to stop all spawned ChanPartitionConsume processes.
 func (kc *KClient) StopPartitionConsumers() {
 	if _, ok := <-kc.stopChan; ok {
+		fmt.Println("STOPHERE", ok)
 		close(kc.stopChan)
 	}
+	fmt.Println("DIDNT STOP")
 }
 
 // PartitionOffsetByTime retreives the most recent available offset at the given time (ms) for the specified topic and partition.
