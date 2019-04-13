@@ -84,9 +84,10 @@ func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (me
 }
 
 // ChanPartitionConsume retreives messages from the given topic, partition and literal offset.
-// Meant to be used via a goroutine, a Message channel and bool channel (for stopping the process) should be passed.
-// Will return an error through the msgChan if any are encountered before initializing the Consume Loop.
-func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset int64, msgChan chan *Message, stopChan chan bool) {
+// Meant to be used via a goroutine, a Message channel needs to be created and be passed which is used to receive any messages.
+// Calling StopPartitionConsumers will stop all ChanPartitionConsume processes.
+// Any errors will be passed through the msgChan if received initializing the Consume Loop.
+func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset int64, msgChan chan *Message) {
 	consumer, err := sarama.NewConsumerFromClient(kc.cl)
 	if err != nil {
 		errMsg := fmt.Sprintf("ERROR: %v", err)
@@ -106,10 +107,10 @@ func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset in
 ConsumeLoop:
 	for {
 		select {
+		case <-kc.stopChan:
+			break ConsumeLoop
 		case msg := <-partitionConsumer.Messages():
 			msgChan <- convertMsg(msg)
-		case <-stopChan:
-			break ConsumeLoop
 		}
 	}
 	if err := partitionConsumer.Close(); err != nil {
@@ -119,6 +120,13 @@ ConsumeLoop:
 	if err := consumer.Close(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+}
+
+// StopPartitionConsumers signals to stop all spawned ChanPartitionConsume processes.
+func (kc *KClient) StopPartitionConsumers() {
+	if _, ok := <-kc.stopChan; ok {
+		close(kc.stopChan)
 	}
 }
 

@@ -22,11 +22,14 @@ type KClient struct {
 	apiVers map[int16]int16
 	brokers []*sarama.Broker
 
-	cl     sarama.Client
-	ca     clusterAdmin
-	config *sarama.Config
-	logger *log.Logger
+	cl       sarama.Client
+	ca       clusterAdmin
+	config   *sarama.Config
+	logger   *log.Logger
+	stopChan chan none
 }
+
+type none struct{}
 
 func NewClient(brokerList ...string) (*KClient, error) {
 	conf := GetConf("")
