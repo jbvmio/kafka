@@ -88,6 +88,7 @@ func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (me
 // Calling StopPartitionConsumers will stop all ChanPartitionConsume processes.
 // Any errors will be passed through the msgChan if received initializing the Consume Loop.
 func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset int64, msgChan chan *Message) {
+	var stopNow bool
 	if kc.stopChan == nil {
 		kc.stopChan = make(chan none, 1)
 	}
@@ -111,32 +112,28 @@ ConsumeLoop:
 	for {
 		select {
 		case <-kc.stopChan:
-			fmt.Println("REC STOP!")
-			if err := partitionConsumer.Close(); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
-			if err := consumer.Close(); err != nil {
-				fmt.Println(err)
-				os.Exit(1)
-			}
+			stopNow = true
 			break ConsumeLoop
-		case msg, ok := <-partitionConsumer.Messages():
-			if !ok {
+		case msg := <-partitionConsumer.Messages():
+			msgChan <- convertMsg(msg)
+			if stopNow {
 				break ConsumeLoop
 			}
-			msgChan <- convertMsg(msg)
 		}
+	}
+	if err := partitionConsumer.Close(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	if err := consumer.Close(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 }
 
 // StopPartitionConsumers signals to stop all spawned ChanPartitionConsume processes.
 func (kc *KClient) StopPartitionConsumers() {
-	if _, ok := <-kc.stopChan; ok {
-		fmt.Println("STOPHERE", ok)
-		close(kc.stopChan)
-	}
-	fmt.Println("DIDNT STOP")
+	close(kc.stopChan)
 }
 
 // PartitionOffsetByTime retreives the most recent available offset at the given time (ms) for the specified topic and partition.
