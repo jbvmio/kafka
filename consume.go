@@ -88,6 +88,9 @@ func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (me
 // Calling StopPartitionConsumers will stop all ChanPartitionConsume processes.
 // Any errors will be passed through the msgChan if received initializing the Consume Loop.
 func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset int64, msgChan chan *Message) {
+	if kc.stopChan == nil {
+		kc.stopChan = make(chan none, 1)
+	}
 	consumer, err := sarama.NewConsumerFromClient(kc.cl)
 	if err != nil {
 		errMsg := fmt.Sprintf("ERROR: %v", err)
