@@ -111,6 +111,7 @@ ConsumeLoop:
 	for {
 		select {
 		case <-kc.stopChan:
+			fmt.Println("REC STOP!")
 			if err := partitionConsumer.Close(); err != nil {
 				fmt.Println(err)
 				os.Exit(1)
