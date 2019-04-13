@@ -121,7 +121,10 @@ ConsumeLoop:
 				os.Exit(1)
 			}
 			break ConsumeLoop
-		case msg := <-partitionConsumer.Messages():
+		case msg, ok := <-partitionConsumer.Messages():
+			if !ok {
+				break ConsumeLoop
+			}
 			msgChan <- convertMsg(msg)
 		}
 	}
