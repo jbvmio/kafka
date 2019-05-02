@@ -122,24 +122,24 @@ func (kc *KClient) GetGroupListMeta() ([]GroupListMeta, error) {
 	}
 	for _, broker := range kc.brokers {
 		grps, err := broker.ListGroups(&sarama.ListGroupsRequest{})
-		if err != nil {
-			return groups, err
-		}
-		id := broker.ID()
-		coord := broker.Addr()
-		for k, v := range grps.Groups {
-			grp := GroupListMeta{
-				Group:           k,
-				Type:            v,
-				CoordinatorAddr: coord,
-				CoordinatorID:   id,
-			}
-			for _, qg := range qgMeta {
-				if qg.Group == k {
-					grp.State = qg.State
+		if err == nil {
+			//return groups, err
+			id := broker.ID()
+			coord := broker.Addr()
+			for k, v := range grps.Groups {
+				grp := GroupListMeta{
+					Group:           k,
+					Type:            v,
+					CoordinatorAddr: coord,
+					CoordinatorID:   id,
 				}
+				for _, qg := range qgMeta {
+					if qg.Group == k {
+						grp.State = qg.State
+					}
+				}
+				groups = append(groups, grp)
 			}
-			groups = append(groups, grp)
 		}
 	}
 	return groups, nil
