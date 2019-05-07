@@ -19,7 +19,7 @@ type ConsumerGroup struct {
 
 // CGMeta contains Metadata related to a ConsumerGroup.
 type CGMeta struct {
-	Claims  map[string][]int32
+	Offsets map[string]map[int32]int64
 	Members map[string]map[int32]string
 	GenIDs  map[string]int32
 }
@@ -34,11 +34,18 @@ func (cg *ConsumerGroup) GET(topic string, handler ProcessMessageFunc) {
 	cg.handlers.Handles[topic] = handler
 }
 
+// GETALL configures the ConsumerGroup to process all configured topics with the corresponding ProcessMessageFunc.
+func (cg *ConsumerGroup) GETALL(handler ProcessMessageFunc) {
+	for topic := range cg.handlers.Handles {
+		cg.handlers.Handles[topic] = handler
+	}
+}
+
 // Consume joins a cluster of consumers for a given list of topics and
 // starts a blocking ConsumerGroupSession through the ConsumerGroupHandler.
 //func (cg *ConsumerGroup) Consume(ctx context.Context, topics []string, handler sarama.ConsumerGroupHandler) error {
 func (cg *ConsumerGroup) Consume() error {
-	if len(cg.handlers.Handles) > 1 {
+	if len(cg.handlers.Handles) < 1 {
 		panic("No topics configured for Consumer Group ")
 	}
 	var topics []string
@@ -94,29 +101,39 @@ func newTopicHandlerMap() TopicHandlerMap {
 
 // Setup is run at the beginning of a new session, before ConsumeClaim.
 func (h CGHandler) Setup(sess sarama.ConsumerGroupSession) error {
-	claims := sess.Claims()
-	mID := sess.MemberID()
-	for t, p := range claims {
-		memMap := make(map[int32]string, len(p))
-		for _, part := range p {
-			memMap[part] = mID
+	for t, p := range sess.Claims() {
+		if h.cg.Metadata.Members[t] == nil {
+			h.cg.Metadata.Members[t] = make(map[int32]string)
 		}
-		h.cg.Metadata.Members[t] = memMap
-		h.cg.Metadata.Claims[t] = claims[t]
-		h.cg.Metadata.GenIDs[t] = sess.GenerationID()
+		if h.cg.Metadata.Offsets[t] == nil {
+			h.cg.Metadata.Offsets[t] = make(map[int32]int64)
+		}
+		if sess.GenerationID() > h.cg.Metadata.GenIDs[t] {
+			h.cg.Metadata.GenIDs[t] = sess.GenerationID()
+		}
+		for _, part := range p {
+			h.cg.Metadata.Members[t][part] = sess.MemberID()
+		}
 	}
 	return nil
 }
 
 // Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited.
 func (h CGHandler) Cleanup(sess sarama.ConsumerGroupSession) error {
+	/* For Future TroubleShooting or Debugging options:
+	for t, parts := range sess.Claims() {
+		for _, p := range parts {
+			fmt.Println(h.cg.Metadata.Members[t][p], "> Topic:", t, ">", p)
+		}
+	}
+	*/
 	return nil
 }
 
 // ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
 func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
 	var (
-		currentOffset int64
+		currentOffset = claim.InitialOffset()
 		good          bool
 		err           error
 	)
@@ -130,11 +147,17 @@ func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.C
 			}
 			sess.MarkMessage(msg, "")
 			currentOffset = msg.Offset
+			sess.MarkOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
 		}
 	} else {
 		panic("No handler for given topic " + claim.Topic())
 	}
-	sess.MarkOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
+	sess.ResetOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
+	/*  May not need to reset offset if none were committed.
+	if currentOffset >= 0 {
+		sess.ResetOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
+	}
+	*/
 	return err
 }
 
@@ -156,7 +179,7 @@ func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, top
 	}
 	cg.handlers = newCGHandler(cg)
 	cg.Metadata = CGMeta{
-		Claims:  make(map[string][]int32),
+		Offsets: make(map[string]map[int32]int64),
 		Members: make(map[string]map[int32]string),
 		GenIDs:  make(map[string]int32),
 	}
@@ -182,7 +205,7 @@ func (kc *KClient) NewConsumerGroup(groupID string, topics ...string) (*Consumer
 	}
 	cg.handlers = newCGHandler(cg)
 	cg.Metadata = CGMeta{
-		Claims:  make(map[string][]int32),
+		Offsets: make(map[string]map[int32]int64),
 		Members: make(map[string]map[int32]string),
 		GenIDs:  make(map[string]int32),
 	}
