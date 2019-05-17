@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Shopify/sarama"
 )
@@ -43,8 +44,8 @@ func (cg *ConsumerGroup) GETALL(handler ProcessMessageFunc) {
 
 // Consume joins a cluster of consumers for a given list of topics and
 // starts a blocking ConsumerGroupSession through the ConsumerGroupHandler.
-//func (cg *ConsumerGroup) Consume(ctx context.Context, topics []string, handler sarama.ConsumerGroupHandler) error {
 func (cg *ConsumerGroup) Consume() error {
+	var err error
 	if len(cg.handlers.Handles) < 1 {
 		panic("No topics configured for Consumer Group ")
 	}
@@ -52,7 +53,14 @@ func (cg *ConsumerGroup) Consume() error {
 	for t := range cg.handlers.Handles {
 		topics = append(topics, t)
 	}
-	return cg.consumer.Consume(cg.ctx, topics, cg.handlers)
+ConsumeLoop:
+	for {
+		err = cg.consumer.Consume(cg.ctx, topics, cg.handlers)
+		if err != nil {
+			break ConsumeLoop
+		}
+	}
+	return err
 }
 
 // Errors returns a read channel of errors that occurred during the consumer life-cycle.
@@ -152,7 +160,7 @@ func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.C
 	} else {
 		panic("No handler for given topic " + claim.Topic())
 	}
-	sess.ResetOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
+	//sess.ResetOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
 	/*  May not need to reset offset if none were committed.
 	if currentOffset >= 0 {
 		sess.ResetOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
@@ -166,8 +174,13 @@ func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, top
 	if config == nil {
 		config = GetConf("")
 		config.Version = RecKafkaVersion
+		config.Consumer.Return.Errors = true
+		config.Consumer.Group.Session.Timeout = time.Second * 10
+		config.Consumer.Group.Heartbeat.Interval = time.Second * 3
+		config.Consumer.Group.Rebalance.Retry.Backoff = time.Second * 2
+		config.Consumer.Group.Rebalance.Retry.Max = 3
+		config.Consumer.MaxProcessingTime = time.Millisecond * 500
 	}
-	config.Consumer.Return.Errors = true
 	group, err := sarama.NewConsumerGroup(addrs, groupID, config)
 	if err != nil {
 		return nil, err
@@ -193,7 +206,14 @@ func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, top
 
 // NewConsumerGroup returns a new ConsumerGroup using an existing KClient.
 func (kc *KClient) NewConsumerGroup(groupID string, topics ...string) (*ConsumerGroup, error) {
+	/*Consumer Group Options to be aware of:
 	kc.config.Consumer.Return.Errors = true
+	kc.config.Consumer.Group.Session.Timeout = time.Second * 10
+	kc.config.Consumer.Group.Heartbeat.Interval = time.Second * 3
+	kc.config.Consumer.Group.Rebalance.Retry.Backoff = time.Second * 2
+	kc.config.Consumer.Group.Rebalance.Retry.Max = 3
+	kc.config.Consumer.MaxProcessingTime = time.Millisecond * 500
+	*/
 	group, err := sarama.NewConsumerGroupFromClient(groupID, kc.cl)
 	if err != nil {
 		return nil, err
