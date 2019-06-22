@@ -35,6 +35,8 @@ func (m *Message) toSarama() *sarama.ProducerMessage {
 		Key:       sarama.ByteEncoder(m.Key),
 		Value:     sarama.ByteEncoder(m.Value),
 		Partition: m.Partition,
+		Offset:    m.Offset,
+		Timestamp: m.Timestamp,
 	}
 }
 

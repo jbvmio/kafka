@@ -206,13 +206,13 @@ func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, top
 
 // NewConsumerGroup returns a new ConsumerGroup using an existing KClient.
 func (kc *KClient) NewConsumerGroup(groupID string, topics ...string) (*ConsumerGroup, error) {
-	/*Consumer Group Options to be aware of:
-	kc.config.Consumer.Return.Errors = true
-	kc.config.Consumer.Group.Session.Timeout = time.Second * 10
-	kc.config.Consumer.Group.Heartbeat.Interval = time.Second * 3
-	kc.config.Consumer.Group.Rebalance.Retry.Backoff = time.Second * 2
-	kc.config.Consumer.Group.Rebalance.Retry.Max = 3
-	kc.config.Consumer.MaxProcessingTime = time.Millisecond * 500
+	/*	Consumer Group Options to be aware of:
+		kc.config.Consumer.Return.Errors = true
+		kc.config.Consumer.Group.Session.Timeout = time.Second * 10
+		kc.config.Consumer.Group.Heartbeat.Interval = time.Second * 3
+		kc.config.Consumer.Group.Rebalance.Retry.Backoff = time.Second * 2
+		kc.config.Consumer.Group.Rebalance.Retry.Max = 3
+		kc.config.Consumer.MaxProcessingTime = time.Millisecond * 500
 	*/
 	group, err := sarama.NewConsumerGroupFromClient(groupID, kc.cl)
 	if err != nil {
