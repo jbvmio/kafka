@@ -1,6 +1,18 @@
 package kafka
 
-import "github.com/Shopify/sarama"
+import (
+	"fmt"
+	"time"
+
+	"github.com/Shopify/sarama"
+)
+
+// ProducerError is the type of error generated when the producer fails to deliver a message.
+// It contains the original ProducerMessage as well as the actual error value.
+type ProducerError struct {
+	Msg *Message
+	Err error
+}
 
 // SendMSG sends a message to the targeted topic/partition defined in the message.
 func (kc *KClient) SendMSG(message *Message) (partition int32, offset int64, err error) {
@@ -30,8 +42,10 @@ func (kc *KClient) SendMessages(messages []*Message) (err error) {
 
 // Producer is the implementation of an AsyncProducer.
 type Producer struct {
-	producer sarama.AsyncProducer
-	cl       *KClient
+	producer         sarama.AsyncProducer
+	cl               *KClient
+	errors           chan *ProducerError
+	input, successes chan *Message
 }
 
 // NewProducer returns a new Producer with Successes and Error channels that must be read from.
@@ -55,6 +69,9 @@ func NewProducer(addrs []string, config *sarama.Config) (*Producer, error) {
 	}
 	producer.producer = p
 	producer.cl = kc
+	producer.errors = make(chan *ProducerError)
+	producer.input = make(chan *Message)
+	producer.successes = make(chan *Message)
 	return &producer, nil
 }
 
@@ -71,7 +88,13 @@ func (kc *KClient) NewProducer(addrs []string, config *sarama.Config) (*Producer
 	if err != nil {
 		return &Producer{}, err
 	}
-	return &Producer{producer: p, cl: kc}, nil
+	return &Producer{
+		producer:  p,
+		cl:        kc,
+		errors:    make(chan *ProducerError),
+		input:     make(chan *Message),
+		successes: make(chan *Message),
+	}, nil
 }
 
 // RequiredAcks sets the desired number of replica acknowledgements it must see from the broker
@@ -106,4 +129,56 @@ func (p *Producer) SetPartitioner(n int) {
 	default:
 		p.cl.SaramaConfig().Producer.Partitioner = sarama.NewRoundRobinPartitioner
 	}
+}
+
+// AsyncClose triggers a shutdown of the producer. The shutdown has completed
+// when both the Errors and Successes channels have been closed. When calling
+// AsyncClose, you *must* continue to read from those channels in order to
+// drain the results of any messages in flight.
+func (p *Producer) AsyncClose() {
+	p.producer.AsyncClose()
+}
+
+// Close shuts down the producer and waits for any buffered messages to be
+// flushed. You must call this function before a producer object passes out of
+// scope, as it may otherwise leak memory. You must call this before calling
+// Close on the underlying client.
+func (p *Producer) Close() error {
+	return p.producer.Close()
+}
+
+// Shutdown starts the shutdown of the producer, draining both Errors and Successes channels, then closes the underlying client.
+// A given timeout value (in seconds) can be used to specify an allotted time for draining the channels.
+// If the timer expires and error will be returned.
+func (p *Producer) Shutdown(timeout int) error {
+	var errd error
+	var closed bool
+	p.producer.AsyncClose()
+	timer := time.NewTicker(time.Duration(timeout) * time.Second)
+drainLoop:
+	for {
+		select {
+		case <-timer.C:
+			err := p.producer.Close()
+			if err != nil {
+				errd = fmt.Errorf("Timed out Draining Producer. Error Closing Client: %v", err)
+			} else {
+				closed = true
+				errd = fmt.Errorf("Timed out Draining Producer")
+			}
+			break drainLoop
+		case <-p.producer.Successes():
+		case <-p.producer.Errors():
+		}
+	}
+	if !closed {
+		errd = p.producer.Close()
+	}
+	return errd
+}
+
+// Input is the input channel for the user to write messages to that they
+// wish to send.
+func (p *Producer) Input() chan<- *Message {
+	return p.producer.Input()
 }
