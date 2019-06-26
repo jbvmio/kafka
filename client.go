@@ -248,6 +248,7 @@ func GetConf(clientID ...string) *sarama.Config {
 		random := makeHex(3)
 		conf.ClientID = string(clientID[0] + "-" + random)
 	}
+	conf.Version = RecKafkaVersion
 	return conf
 }
 

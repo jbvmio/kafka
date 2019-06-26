@@ -16,6 +16,7 @@ type Message struct {
 	Partition  int32
 	Offset     int64
 	Timestamp  time.Time
+	Metadata   interface{}
 }
 
 func convertMsg(m *sarama.ConsumerMessage) (msg *Message) {
@@ -37,7 +38,59 @@ func (m *Message) toSarama() *sarama.ProducerMessage {
 		Partition: m.Partition,
 		Offset:    m.Offset,
 		Timestamp: m.Timestamp,
+		Metadata:  m.Metadata,
 	}
+}
+
+// BatchFetchMessages retrieves a batch of messages identified by a topic and partition offset map.
+// WIP* Do not use.
+func (kc *KClient) BatchFetchMessages(topic string, poMap map[int32][]int64) (messages []*Message, err error) {
+	var response *sarama.FetchResponse
+	fetchRequest := sarama.FetchRequest{}
+
+	for part, offsets := range poMap {
+		for _, o := range offsets {
+			fetchRequest.AddBlock(topic, part, o, kc.config.Consumer.Fetch.Default)
+		}
+	}
+
+	var errd error
+	for _, b := range kc.brokers {
+		response, errd = b.Fetch(&fetchRequest)
+		if errd == nil && response != nil {
+			break
+		}
+		if errd != nil {
+			err = errd
+		}
+	}
+	if err != nil {
+		return
+	}
+	if response == nil {
+		err = fmt.Errorf("%v", "received nil response")
+		return
+	}
+
+	blocks, ok := response.Blocks[topic]
+
+	if ok {
+		for part, block := range blocks {
+			for _, rs := range block.RecordsSet {
+				for _, msg := range rs.MsgSet.Messages {
+					messages = append(messages, &Message{
+						Topic:     topic,
+						Key:       msg.Msg.Key,
+						Value:     msg.Msg.Value,
+						Partition: part,
+						Offset:    msg.Offset,
+						Timestamp: msg.Msg.Timestamp,
+					})
+				}
+			}
+		}
+	}
+	return
 }
 
 // ConsumeOffsetMsg retreives a single message from the given topic, partition and literal offset.

@@ -39,6 +39,7 @@ func convertProducerMsg(m *sarama.ProducerMessage) (msg *Message) {
 		Partition: m.Partition,
 		Offset:    m.Offset,
 		Timestamp: m.Timestamp,
+		Metadata:  m.Metadata,
 	}
 }
 
@@ -110,7 +111,7 @@ func NewProducer(addrs []string, config *sarama.Config) (*Producer, error) {
 }
 
 // NewProducer returns a new Producer with Successes and Error channels that must be read from.
-func (kc *KClient) NewProducer(addrs []string, config *sarama.Config) (*Producer, error) {
+func (kc *KClient) NewProducer() (*Producer, error) {
 	/*	Producer Options to be aware of:
 		config.Version = RecKafkaVersion
 		config.Producer.Return.Successes = true
@@ -198,26 +199,34 @@ func (p *Producer) Shutdown(timeout ...int) error {
 		to = 10
 	}
 	var errd error
-	doneMap := make(map[uint8]bool, 2)
+	//doneMap := make(map[uint8]bool, 2)
+	var done uint8
+	doneChan := make(chan uint8)
 	close(p.killChan)
 	p.producer.AsyncClose()
 	timer := time.NewTicker(time.Duration(to) * time.Second)
+
+	go func() {
+		for range p.producer.Successes() {
+		}
+		doneChan <- 1
+	}()
+
+	go func() {
+		for range p.producer.Errors() {
+		}
+		doneChan <- 1
+	}()
+
 drainLoop:
 	for {
 		select {
 		case <-timer.C:
 			errd = fmt.Errorf("Timed out Draining Producer")
 			break drainLoop
-		case _, ok := <-p.producer.Successes():
-			if !ok {
-				doneMap[1] = true
-			}
-		case _, ok := <-p.producer.Errors():
-			if !ok {
-				doneMap[2] = true
-			}
-		default:
-			if doneMap[1] && doneMap[2] {
+		case <-doneChan:
+			done++
+			if done == 2 {
 				break drainLoop
 			}
 		}
@@ -225,6 +234,32 @@ drainLoop:
 	if !p.noClose {
 		p.cl.Close()
 	}
+
+	/*
+		drainLoop:
+			for {
+				select {
+				case <-timer.C:
+					errd = fmt.Errorf("Timed out Draining Producer")
+					break drainLoop
+				case _, ok := <-p.producer.Successes():
+					if !ok {
+						doneMap[1] = true
+					}
+				case _, ok := <-p.producer.Errors():
+					if !ok {
+						doneMap[2] = true
+					}
+				default:
+					if doneMap[1] && doneMap[2] {
+						break drainLoop
+					}
+				}
+			}
+			if !p.noClose {
+				p.cl.Close()
+			}
+	*/
 	return errd
 }
 
@@ -238,7 +273,7 @@ func (p *Producer) Input() chan<- *Message {
 // enabled. If Return.Successes is true, you MUST read from this channel or the
 // Producer will deadlock. It is suggested that you send and read messages
 // together in a single select statement.
-func (p *Producer) Successes() chan<- *Message {
+func (p *Producer) Successes() <-chan *Message {
 	return p.successes
 }
 
@@ -246,7 +281,7 @@ func (p *Producer) Successes() chan<- *Message {
 // channel or the Producer will deadlock when the channel is full. Alternatively,
 // you can set Producer.Return.Errors in your config to false, which prevents
 // errors to be returned.
-func (p *Producer) Errors() chan<- *ProducerError {
+func (p *Producer) Errors() <-chan *ProducerError {
 	return p.errors
 }
 

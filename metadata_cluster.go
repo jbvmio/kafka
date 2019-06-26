@@ -199,9 +199,11 @@ var APIDescriptions = map[int16]string{
 	APIKeyDeleteGroups:            "DeleteGroups",
 }
 
+// Kafka API Versions:
 var (
 	MinKafkaVersion     = sarama.MinVersion
 	MaxKafkaVersion     = sarama.MaxVersion
+	VER210KafkaVersion  = sarama.V2_1_0_0
 	RecKafkaVersion     = sarama.V1_1_0_0
 	MinCreatePartsVer   = sarama.V1_0_0_0
 	MinDeleteRecordsVer = sarama.V0_11_0_0
