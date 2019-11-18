@@ -36,8 +36,21 @@ func (kc *KClient) GetTopicConfig(topic string, configName ...string) ([]sarama.
 }
 
 func (kc *KClient) SetTopicConfig(topic, configName, value string) error {
-	entry := make(map[string]*string, 1)
+	entry := make(map[string]*string)
+	existing, err := kc.GetTopicConfig(topic)
+	if err != nil {
+		return err
+	}
+	for _, e := range existing {
+		val := e.Value
+		entry[e.Name] = &val
+	}
 	entry[configName] = &value
+	return kc.Admin().AlterConfig(sarama.TopicResource, topic, entry, false)
+}
+
+func (kc *KClient) ResetTopicConfig(topic string) error {
+	entry := make(map[string]*string)
 	return kc.Admin().AlterConfig(sarama.TopicResource, topic, entry, false)
 }
 
