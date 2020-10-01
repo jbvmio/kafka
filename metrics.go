@@ -72,9 +72,9 @@ func (m *RawMetric) getMetricType() {
 	}
 }
 
-// ConvertToMetric converts the RawMetric and returns a KafkaMetric.
-func (m *RawMetric) ConvertToMetric() *KafkaMetric {
-	var KM KafkaMetric
+// ConvertToMetric converts the RawMetric and returns a Metric.
+func (m *RawMetric) ConvertToMetric() *Metric {
+	var KM Metric
 	switch {
 	case m.Type[meterMetricType]:
 		KM = &MeterMetric{
@@ -100,7 +100,7 @@ func (m *RawMetric) ConvertToMetric() *KafkaMetric {
 	return &KM
 }
 
-// MetricCollection contains a collection of KafkaMetrics.
+// MetricCollection contains a collection of Metrics.
 type MetricCollection struct {
 	Meters     []MeterMetric
 	Histograms []HistoMetric
@@ -123,8 +123,8 @@ func (mc *MetricCollection) AddFromRaw(rawMetrics ...*RawMetric) {
 	}
 }
 
-// Add recieves a KafkaMetric and appends it to its appropriate collection type.
-func (mc *MetricCollection) Add(metrics ...*KafkaMetric) {
+// Add recieves a Metric and appends it to its appropriate collection type.
+func (mc *MetricCollection) Add(metrics ...*Metric) {
 	for _, metric := range metrics {
 		m := *metric
 		switch {
@@ -136,8 +136,8 @@ func (mc *MetricCollection) Add(metrics ...*KafkaMetric) {
 	}
 }
 
-// KafkaMetric represents a metric measurement from Kafka.
-type KafkaMetric interface {
+// Metric represents a metric measurement from Kafka.
+type Metric interface {
 	GetType() string
 	IsMeter() bool
 	IsHisto() bool

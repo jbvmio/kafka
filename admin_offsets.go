@@ -19,6 +19,7 @@ const (
 	OffsetOldest int64 = -2
 )
 
+// OffsetAdmin is used for managing offsets.
 type OffsetAdmin interface {
 	Group(group string) OffsetAdmin
 	Topic(topic string) OffsetAdmin
@@ -37,6 +38,7 @@ type offsetAdmin struct {
 	pom    sarama.PartitionOffsetManager
 }
 
+// GroupLag details Group Lag.
 type GroupLag struct {
 	Group           string
 	Topic           string
@@ -51,28 +53,33 @@ type grpPartLag struct {
 	lag       int64
 }
 
+// GroupOffsetMap details offsets for each partition in a map.
 type GroupOffsetMap struct {
 	Group           string
 	Topic           string
 	PartitionOffset map[int32]int64
 }
 
+// OffSetAdmin returns the underlying OffsetAdmin used to chain commands for offset management.
 func (kc *KClient) OffSetAdmin() OffsetAdmin {
 	return &offsetAdmin{
 		client: kc.cl,
 	}
 }
 
+// Group to target.
 func (oa *offsetAdmin) Group(group string) OffsetAdmin {
 	oa.grp = group
 	return oa
 }
 
+// Topic to Target.
 func (oa *offsetAdmin) Topic(topic string) OffsetAdmin {
 	oa.top = topic
 	return oa
 }
 
+// Valid returns true if offset admin has both a target group and topic entered, false otherwise.
 func (oa *offsetAdmin) Valid() bool {
 	if oa.grp == "" || oa.top == "" {
 		return false
@@ -108,6 +115,7 @@ func (oa *offsetAdmin) GetOffsetLag(partition int32) (groupOffset int64, partiti
 	return
 }
 
+// GetTotalLag returns the total lag for a Group.
 func (oa *offsetAdmin) GetTotalLag(partitions []int32) (groupLag GroupLag, err error) {
 	if !oa.Valid() {
 		err = fmt.Errorf("No specified Group and/or Topic")
@@ -202,6 +210,7 @@ func (oa *offsetAdmin) GetGroupOffsets(partitions []int32) (groupOffsetMap Group
 	return
 }
 
+// ResetOffset resets an partition to the target Offset.
 func (oa *offsetAdmin) ResetOffset(partition int32, targetOffset int64) (err error) {
 	if !oa.Valid() {
 		err = fmt.Errorf("No specified Group and/or Topic")

@@ -10,10 +10,8 @@ import (
 )
 
 func TestNewClient(t *testing.T) {
-	seedBroker := sarama.NewMockBroker(t, 1)
-	metaResponse := new(sarama.MetadataResponse)
-	seedBroker.Returns(metaResponse)
-	client, err := NewClient(seedBroker.Addr())
+	seedBroker, controllerBroker := getTestingBrokers(t)
+	client, err := NewClient(seedBroker.Addr(), controllerBroker.Addr())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,12 +23,10 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestCustomClient(t *testing.T) {
-	seedBroker := sarama.NewMockBroker(t, 1)
-	metaResponse := new(sarama.MetadataResponse)
-	seedBroker.Returns(metaResponse)
+	seedBroker, controllerBroker := getTestingBrokers(t)
 	conf := GetConf("testID")
 	conf.Metadata.Retry.Max = 0
-	client, err := NewCustomClient(conf, seedBroker.Addr())
+	client, err := NewCustomClient(conf, seedBroker.Addr(), controllerBroker.Addr())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,10 +45,8 @@ func TestLogging(t *testing.T) {
 }
 
 func TestClientLogging(t *testing.T) {
-	seedBroker := sarama.NewMockBroker(t, 1)
-	metaResponse := new(sarama.MetadataResponse)
-	seedBroker.Returns(metaResponse)
-	client, err := NewClient(seedBroker.Addr())
+	seedBroker, controllerBroker := getTestingBrokers(t)
+	client, err := NewClient(seedBroker.Addr(), controllerBroker.Addr())
 	if err != nil {
 		t.Fatal(err)
 	}

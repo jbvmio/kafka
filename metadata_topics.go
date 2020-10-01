@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cast"
 )
 
+// TopicSummary contains a summary for a Topic.
 type TopicSummary struct {
 	Topic           string
 	Parts           string
@@ -16,6 +17,7 @@ type TopicSummary struct {
 	Partitions      []int32
 }
 
+// TopicMeta contains detailed information for a Topic.
 type TopicMeta struct {
 	Topic           string
 	Partition       int32
@@ -25,6 +27,7 @@ type TopicMeta struct {
 	OfflineReplicas []int32
 }
 
+// TopicOffsetMap returns offset details for a Topic.
 type TopicOffsetMap struct {
 	Topic            string
 	TopicMeta        []TopicMeta
@@ -40,6 +43,7 @@ type partitionOffset struct {
 	oldest    int64
 }
 
+// MakeTopicOffsetMap creates a TopicOffsetMap for the given TopicMeta.
 func (kc *KClient) MakeTopicOffsetMap(topicMeta []TopicMeta) []TopicOffsetMap {
 	var TOM []TopicOffsetMap
 	parts := make(map[string][]int32)
@@ -142,6 +146,7 @@ func (kc *KClient) makeTopicOffsetMap2(topicMeta []TopicMeta) []TopicOffsetMap {
 	return TOM
 }
 
+// GetTopicSummaries creates Topic Summaries for the give TopicMeta.
 func GetTopicSummaries(topicMeta []TopicMeta) []TopicSummary {
 	var topicSummary []TopicSummary
 	parts := make(map[string][]int32, len(topicMeta))
@@ -199,6 +204,7 @@ func (kc *KClient) GetTopicMeta() ([]TopicMeta, error) {
 	return topicMeta, err
 }
 
+// ListTopics returns a list of Topics on a Kafka Cluster.
 func (kc *KClient) ListTopics() ([]string, error) {
 	res, err := kc.ReqMetadata()
 	if err != nil {
@@ -249,10 +255,12 @@ func makeSeqStr(nums []int32) string {
 	return seqStr
 }
 
+// GetOffsetNewest returns the newest offset for a topic and partition.
 func (kc *KClient) GetOffsetNewest(topic string, partition int32) (int64, error) {
 	return kc.cl.GetOffset(topic, partition, sarama.OffsetNewest)
 }
 
+// GetOffsetOldest returns the oldest offset for a topic and partition.
 func (kc *KClient) GetOffsetOldest(topic string, partition int32) (int64, error) {
 	return kc.cl.GetOffset(topic, partition, sarama.OffsetOldest)
 }

@@ -18,12 +18,13 @@ var (
 	logging bool
 )
 
+// KClient is a Kafka Client ...
 type KClient struct {
 	apiVers map[int16]int16
 	brokers []*sarama.Broker
 
 	cl       sarama.Client
-	ca       clusterAdmin
+	ca       sarama.ClusterAdmin
 	config   *sarama.Config
 	logger   *log.Logger
 	stopChan chan none
@@ -31,6 +32,7 @@ type KClient struct {
 
 type none struct{}
 
+// NewClient returns a new KClient.
 func NewClient(brokerList ...string) (*KClient, error) {
 	conf := GetConf("")
 	client, err := getClient(conf, brokerList...)
@@ -47,6 +49,7 @@ func NewClient(brokerList ...string) (*KClient, error) {
 	return &kc, nil
 }
 
+// NewCustomClient returns a new KClient using an sarama Config.
 func NewCustomClient(conf *sarama.Config, brokerList ...string) (*KClient, error) {
 	var client sarama.Client
 	switch {
@@ -76,10 +79,12 @@ func NewCustomClient(conf *sarama.Config, brokerList ...string) (*KClient, error
 	return &kc, nil
 }
 
+// Controller returns the Controller Broker.
 func (kc *KClient) Controller() (*sarama.Broker, error) {
 	return kc.cl.Controller()
 }
 
+// Connect connects to the Brokers.
 func (kc *KClient) Connect() error {
 	for _, broker := range kc.brokers {
 		if ok, _ := broker.Connected(); !ok {
@@ -91,6 +96,7 @@ func (kc *KClient) Connect() error {
 	return nil
 }
 
+// IsConnected returns true if the client is connected to at least on Broker.
 func (kc *KClient) IsConnected() bool {
 	for _, broker := range kc.brokers {
 		if ok, _ := broker.Connected(); ok {
@@ -100,6 +106,7 @@ func (kc *KClient) IsConnected() bool {
 	return false
 }
 
+// Close closes the KClients connections to the Brokers.
 func (kc *KClient) Close() error {
 	errString := fmt.Sprintf("ERROR:\n")
 	var errFound bool

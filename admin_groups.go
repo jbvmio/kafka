@@ -6,6 +6,7 @@ import (
 	"github.com/Shopify/sarama"
 )
 
+// RemoveGroup deletes a Group from Kafka.
 func (kc *KClient) RemoveGroup(name string) (errMsg error) {
 	var brokerErr error
 	var found bool

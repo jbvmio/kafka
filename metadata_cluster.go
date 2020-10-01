@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cast"
 )
 
+// ClusterMeta contains metadata for a Kafka Cluster.
 type ClusterMeta struct {
 	BrokerIDs      []int32
 	Brokers        []string
@@ -18,18 +19,22 @@ type ClusterMeta struct {
 	ErrorStack     []string
 }
 
+// BrokerCount returns the number of brokers.
 func (cm ClusterMeta) BrokerCount() int {
 	return len(cm.Brokers)
 }
 
+// TopicCount returns the number of Topics.
 func (cm ClusterMeta) TopicCount() int {
 	return len(cm.Topics)
 }
 
+// GroupCount returns the number of Groups.
 func (cm ClusterMeta) GroupCount() int {
 	return len(cm.Groups)
 }
 
+// BrokerList returns the list of brokers.
 func (kc *KClient) BrokerList() ([]string, error) {
 	var brokerlist []string
 	res, err := kc.ReqMetadata()
@@ -42,6 +47,7 @@ func (kc *KClient) BrokerList() ([]string, error) {
 	return brokerlist, nil
 }
 
+// BrokerIDMap returns broker addresses by their corresponding IDs.
 func (kc *KClient) BrokerIDMap() (map[int32]string, error) {
 	brokerMap := make(map[int32]string, len(kc.brokers))
 	res, err := kc.ReqMetadata()
@@ -54,6 +60,7 @@ func (kc *KClient) BrokerIDMap() (map[int32]string, error) {
 	return brokerMap, nil
 }
 
+// GetClusterMeta returns Cluster Metadata.
 func (kc *KClient) GetClusterMeta() (ClusterMeta, error) {
 	cm := ClusterMeta{}
 	res, err := kc.ReqMetadata()
@@ -90,6 +97,7 @@ func (kc *KClient) GetClusterMeta() (ClusterMeta, error) {
 	return cm, nil
 }
 
+// ReqMetadata returns a metadata response from the first responsive broker.
 func (kc *KClient) ReqMetadata() (*sarama.MetadataResponse, error) {
 	var res *sarama.MetadataResponse
 	var err error
@@ -125,11 +133,11 @@ const (
 	APIKeyDescribeGroups
 	APIKeyListGroups
 	APIKeySaslHandshake
-	APIKeyApiVersions
+	APIKeyAPIVersions
 	APIKeyCreateTopics
 	APIKeyDeleteTopics
 	APIKeyDeleteRecords
-	APIKeyInitProducerId
+	APIKeyInitProducerID
 	APIKeyOffsetForLeaderEpoch
 	APIKeyAddPartitionsToTxn
 	APIKeyAddOffsetsToTxn
@@ -152,55 +160,66 @@ const (
 	APIKeyDeleteGroups
 	APIKeyElectPreferredLeaders
 	APIKeyIncrementalAlterConfigs
+	APIKeyAlterPartitionReassignments
+	APIKeyListPartitionReassignments
+	APIKeyOffsetDelete
+	APIKeyDescribeClientQuotas
+	APIKeyAlterClientQuotas
 )
 
-// APIKey Descriptions
+// APIDescriptions for APIs.
+// https://kafka.apache.org/protocol
 var APIDescriptions = map[int16]string{
-	APIKeyProduce:                 "Produce",
-	APIKeyFetch:                   "Fetch",
-	APIKeyListOffsets:             "ListOffsets",
-	APIKeyMetadata:                "Metadata",
-	APIKeyLeaderAndIsr:            "LeaderAndIsr",
-	APIKeyStopReplica:             "StopReplica",
-	APIKeyUpdateMetadata:          "UpdateMetadata",
-	APIKeyControlledShutdown:      "ControlledShutdown",
-	APIKeyOffsetCommit:            "OffsetCommit",
-	APIKeyOffsetFetch:             "OffsetFetch",
-	APIKeyFindCoordinator:         "FindCoordinator",
-	APIKeyJoinGroup:               "JoinGroup",
-	APIKeyHeartbeat:               "Heartbeat",
-	APIKeyLeaveGroup:              "LeaveGroup",
-	APIKeySyncGroup:               "SyncGroup",
-	APIKeyDescribeGroups:          "DescribeGroups",
-	APIKeyListGroups:              "ListGroups",
-	APIKeySaslHandshake:           "SaslHandshake",
-	APIKeyApiVersions:             "ApiVersions",
-	APIKeyCreateTopics:            "CreateTopics",
-	APIKeyDeleteTopics:            "DeleteTopics",
-	APIKeyDeleteRecords:           "DeleteRecords",
-	APIKeyInitProducerId:          "InitProducerId",
-	APIKeyOffsetForLeaderEpoch:    "OffsetForLeaderEpoch",
-	APIKeyAddPartitionsToTxn:      "AddPartitionsToTxn",
-	APIKeyAddOffsetsToTxn:         "AddOffsetsToTxn",
-	APIKeyEndTxn:                  "EndTxn",
-	APIKeyWriteTxnMarkers:         "WriteTxnMarkers",
-	APIKeyTxnOffsetCommit:         "TxnOffsetCommit",
-	APIKeyDescribeAcls:            "DescribeAcls",
-	APIKeyCreateAcls:              "CreateAcls",
-	APIKeyDeleteAcls:              "DeleteAcls",
-	APIKeyDescribeConfigs:         "DescribeConfigs",
-	APIKeyAlterConfigs:            "AlterConfigs",
-	APIKeyAlterReplicaLogDirs:     "AlterReplicaLogDirs",
-	APIKeyDescribeLogDirs:         "DescribeLogDirs",
-	APIKeySaslAuthenticate:        "SaslAuthenticate",
-	APIKeyCreatePartitions:        "CreatePartitions",
-	APIKeyCreateDelegationToken:   "CreateDelegationToken",
-	APIKeyRenewDelegationToken:    "RenewDelegationToken",
-	APIKeyExpireDelegationToken:   "ExpireDelegationToken",
-	APIKeyDescribeDelegationToken: "DescribeDelegationToken",
-	APIKeyDeleteGroups:            "DeleteGroups",
-	APIKeyElectPreferredLeaders:   "ElectPreferredLeaders",
-	APIKeyIncrementalAlterConfigs: "IncrementalAlterConfigs",
+	APIKeyProduce:                     "Produce",
+	APIKeyFetch:                       "Fetch",
+	APIKeyListOffsets:                 "ListOffsets",
+	APIKeyMetadata:                    "Metadata",
+	APIKeyLeaderAndIsr:                "LeaderAndIsr",
+	APIKeyStopReplica:                 "StopReplica",
+	APIKeyUpdateMetadata:              "UpdateMetadata",
+	APIKeyControlledShutdown:          "ControlledShutdown",
+	APIKeyOffsetCommit:                "OffsetCommit",
+	APIKeyOffsetFetch:                 "OffsetFetch",
+	APIKeyFindCoordinator:             "FindCoordinator",
+	APIKeyJoinGroup:                   "JoinGroup",
+	APIKeyHeartbeat:                   "Heartbeat",
+	APIKeyLeaveGroup:                  "LeaveGroup",
+	APIKeySyncGroup:                   "SyncGroup",
+	APIKeyDescribeGroups:              "DescribeGroups",
+	APIKeyListGroups:                  "ListGroups",
+	APIKeySaslHandshake:               "SaslHandshake",
+	APIKeyAPIVersions:                 "ApiVersions",
+	APIKeyCreateTopics:                "CreateTopics",
+	APIKeyDeleteTopics:                "DeleteTopics",
+	APIKeyDeleteRecords:               "DeleteRecords",
+	APIKeyInitProducerID:              "InitProducerId",
+	APIKeyOffsetForLeaderEpoch:        "OffsetForLeaderEpoch",
+	APIKeyAddPartitionsToTxn:          "AddPartitionsToTxn",
+	APIKeyAddOffsetsToTxn:             "AddOffsetsToTxn",
+	APIKeyEndTxn:                      "EndTxn",
+	APIKeyWriteTxnMarkers:             "WriteTxnMarkers",
+	APIKeyTxnOffsetCommit:             "TxnOffsetCommit",
+	APIKeyDescribeAcls:                "DescribeAcls",
+	APIKeyCreateAcls:                  "CreateAcls",
+	APIKeyDeleteAcls:                  "DeleteAcls",
+	APIKeyDescribeConfigs:             "DescribeConfigs",
+	APIKeyAlterConfigs:                "AlterConfigs",
+	APIKeyAlterReplicaLogDirs:         "AlterReplicaLogDirs",
+	APIKeyDescribeLogDirs:             "DescribeLogDirs",
+	APIKeySaslAuthenticate:            "SaslAuthenticate",
+	APIKeyCreatePartitions:            "CreatePartitions",
+	APIKeyCreateDelegationToken:       "CreateDelegationToken",
+	APIKeyRenewDelegationToken:        "RenewDelegationToken",
+	APIKeyExpireDelegationToken:       "ExpireDelegationToken",
+	APIKeyDescribeDelegationToken:     "DescribeDelegationToken",
+	APIKeyDeleteGroups:                "DeleteGroups",
+	APIKeyElectPreferredLeaders:       "ElectPreferredLeaders",
+	APIKeyIncrementalAlterConfigs:     "IncrementalAlterConfigs",
+	APIKeyAlterPartitionReassignments: "AlterPartitionReassignments",
+	APIKeyListPartitionReassignments:  "ListPartitionReassignments",
+	APIKeyOffsetDelete:                "OffsetDelete",
+	APIKeyDescribeClientQuotas:        "DescribeClientQuotas",
+	APIKeyAlterClientQuotas:           "AlterClientQuotas",
 }
 
 // Kafka API Versions:
@@ -214,6 +233,7 @@ var (
 	MinTopicOpsVer      = sarama.V0_10_1_0
 )
 
+// GetAPIVersions returns a API version Mapping.
 func (kc *KClient) GetAPIVersions() (apiMaxVers map[int16]int16, err error) {
 	apiMaxVers = make(map[int16]int16)
 	apiVers, err := kc.apiVersions()

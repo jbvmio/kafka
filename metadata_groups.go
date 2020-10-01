@@ -8,6 +8,7 @@ import (
 	"github.com/Shopify/sarama"
 )
 
+// GroupListMeta contains basic info for a Group.
 type GroupListMeta struct {
 	Group           string
 	Type            string
@@ -16,6 +17,15 @@ type GroupListMeta struct {
 	State           string
 }
 
+// QuickGroupMeta is GroupListMeta without the Coordinator for the Group.
+type QuickGroupMeta struct {
+	Group        string
+	State        string
+	ProtocolType string
+	Protocol     string
+}
+
+// GroupMeta contains detailed info for a Group.
 type GroupMeta struct {
 	Group             string
 	Topics            []string
@@ -24,13 +34,7 @@ type GroupMeta struct {
 	MemberAssignments []MemberMeta
 }
 
-type QuickGroupMeta struct {
-	Group        string
-	State        string
-	ProtocolType string
-	Protocol     string
-}
-
+// MemberMeta details a Member of a Group.
 type MemberMeta struct {
 	ClientHost      string
 	ClientID        string
@@ -38,6 +42,7 @@ type MemberMeta struct {
 	TopicPartitions map[string][]int32
 }
 
+// ListGroups returns a list of Groups on a Kafka Cluster.
 func (kc *KClient) ListGroups() (groups []string, errors []string) {
 	var wg sync.WaitGroup
 	for _, broker := range kc.brokers {
@@ -58,6 +63,7 @@ func (kc *KClient) ListGroups() (groups []string, errors []string) {
 	return
 }
 
+// ListGroups2 ...
 func (kc *KClient) ListGroups2() (groups []string, errors []string) {
 	grpChan := make(chan []string, 100)
 	timerChan := make(chan string, len(kc.brokers))
@@ -97,6 +103,7 @@ func (kc *KClient) ListGroups2() (groups []string, errors []string) {
 	return
 }
 
+// BrokerGroups returns a list of Brokers on a Kafka Cluster.
 func (kc *KClient) BrokerGroups(brokerID int32) ([]string, error) {
 	var groups []string
 	for _, b := range kc.brokers {
@@ -114,6 +121,7 @@ func (kc *KClient) BrokerGroups(brokerID int32) ([]string, error) {
 	return nil, fmt.Errorf("no broker with id %v found", brokerID)
 }
 
+// GetGroupListMeta returns basic metadata for Groups on a Kafka Cluster.
 func (kc *KClient) GetGroupListMeta() ([]GroupListMeta, error) {
 	var groups []GroupListMeta
 	qgMeta, err := kc.QuickGroupMeta()
@@ -145,6 +153,7 @@ func (kc *KClient) GetGroupListMeta() ([]GroupListMeta, error) {
 	return groups, nil
 }
 
+// GetGroupMeta returns details metadata for Groups on a Kafka Cluster.
 func (kc *KClient) GetGroupMeta() ([]GroupMeta, error) {
 	var groupMeta []GroupMeta
 	gl, errs := kc.ListGroups()
