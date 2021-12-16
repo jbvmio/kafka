@@ -240,7 +240,7 @@ func (kc *KClient) GetAPIVersions() (apiMaxVers map[int16]int16, err error) {
 	if err != nil {
 		return
 	}
-	for _, api := range apiVers.ApiVersions {
+	for _, api := range apiVers.ApiKeys {
 		apiMaxVers[api.ApiKey] = api.MaxVersion
 	}
 	return
@@ -275,7 +275,7 @@ func BrokerAPIVersions(conf *sarama.Config, broker string) (apiMaxVers map[int16
 		return
 	}
 	apiMaxVers = make(map[int16]int16)
-	for _, api := range apiVers.ApiVersions {
+	for _, api := range apiVers.ApiKeys {
 		apiMaxVers[api.ApiKey] = api.MaxVersion
 	}
 	return
