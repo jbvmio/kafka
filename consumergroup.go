@@ -170,7 +170,7 @@ func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.C
 }
 
 // NewConsumerGroup returns a new ConsumerGroup.
-func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, topics ...string) (*ConsumerGroup, error) {
+func NewConsumerGroup(ctx context.Context, addrs []string, groupID string, config *sarama.Config, topics ...string) (*ConsumerGroup, error) {
 	if config == nil {
 		config = GetConf("")
 		config.Version = RecKafkaVersion
@@ -188,7 +188,7 @@ func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, top
 	cg := &ConsumerGroup{
 		GroupID:  groupID,
 		consumer: group,
-		ctx:      context.Background(),
+		ctx:      ctx,
 	}
 	cg.handlers = newCGHandler(cg)
 	cg.Metadata = CGMeta{
@@ -205,7 +205,7 @@ func NewConsumerGroup(addrs []string, groupID string, config *sarama.Config, top
 }
 
 // NewConsumerGroup returns a new ConsumerGroup using an existing KClient.
-func (kc *KClient) NewConsumerGroup(groupID string, topics ...string) (*ConsumerGroup, error) {
+func (kc *KClient) NewConsumerGroup(ctx context.Context, groupID string, topics ...string) (*ConsumerGroup, error) {
 	/*	Consumer Group Options to be aware of:
 		kc.config.Consumer.Return.Errors = true
 		kc.config.Consumer.Group.Session.Timeout = time.Second * 10
@@ -221,7 +221,7 @@ func (kc *KClient) NewConsumerGroup(groupID string, topics ...string) (*Consumer
 	cg := &ConsumerGroup{
 		GroupID:  groupID,
 		consumer: group,
-		ctx:      context.Background(),
+		ctx:      ctx,
 	}
 	cg.handlers = newCGHandler(cg)
 	cg.Metadata = CGMeta{
