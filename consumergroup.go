@@ -59,6 +59,9 @@ ConsumeLoop:
 		if err != nil {
 			break ConsumeLoop
 		}
+		if cg.ctx.Err() != nil {
+			break ConsumeLoop
+		}
 	}
 	return err
 }
@@ -71,6 +74,16 @@ func (cg *ConsumerGroup) Errors() <-chan error {
 // Close stops the ConsumerGroup and detaches any running sessions.
 func (cg *ConsumerGroup) Close() error {
 	return cg.consumer.Close()
+}
+
+// ResumeAll resumes all partitions that have been paused.
+func (cg *ConsumerGroup) ResumeAll() {
+	cg.consumer.ResumeAll()
+}
+
+// PauseAll suspends fetching from all partitions.
+func (cg *ConsumerGroup) PauseAll() {
+	cg.consumer.PauseAll()
 }
 
 // CGHandler implements sarama ConsumerGroupHandlers.
