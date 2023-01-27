@@ -88,15 +88,16 @@ func (cg *ConsumerGroup) PauseAll() {
 
 // CGHandler implements sarama ConsumerGroupHandlers.
 type CGHandler struct {
-	Handles TopicHandlerMap
-
-	cg *ConsumerGroup
+	Handles           TopicHandlerMap
+	cg                *ConsumerGroup
+	autoCommitEnabled bool
 }
 
-func newCGHandler(cg *ConsumerGroup) CGHandler {
+func newCGHandler(cg *ConsumerGroup, autoCommitEnabled bool) CGHandler {
 	return CGHandler{
-		Handles: newTopicHandlerMap(),
-		cg:      cg,
+		Handles:           newTopicHandlerMap(),
+		autoCommitEnabled: autoCommitEnabled,
+		cg:                cg,
 	}
 }
 
@@ -169,6 +170,9 @@ func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.C
 			sess.MarkMessage(msg, "")
 			currentOffset = msg.Offset
 			sess.MarkOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
+			if !h.autoCommitEnabled {
+				sess.Commit()
+			}
 		}
 	} else {
 		panic("No handler for given topic " + claim.Topic())
@@ -203,7 +207,7 @@ func NewConsumerGroup(ctx context.Context, addrs []string, groupID string, confi
 		consumer: group,
 		ctx:      ctx,
 	}
-	cg.handlers = newCGHandler(cg)
+	cg.handlers = newCGHandler(cg, config.Consumer.Offsets.AutoCommit.Enable)
 	cg.Metadata = CGMeta{
 		Offsets: make(map[string]map[int32]int64),
 		Members: make(map[string]map[int32]string),
@@ -236,7 +240,7 @@ func (kc *KClient) NewConsumerGroup(ctx context.Context, groupID string, topics 
 		consumer: group,
 		ctx:      ctx,
 	}
-	cg.handlers = newCGHandler(cg)
+	cg.handlers = newCGHandler(cg, kc.config.Consumer.Offsets.AutoCommit.Enable)
 	cg.Metadata = CGMeta{
 		Offsets: make(map[string]map[int32]int64),
 		Members: make(map[string]map[int32]string),
