@@ -88,13 +88,15 @@ func (cg *ConsumerGroup) PauseAll() {
 
 // CGHandler implements sarama ConsumerGroupHandlers.
 type CGHandler struct {
+	ctx               context.Context
 	Handles           TopicHandlerMap
 	cg                *ConsumerGroup
 	autoCommitEnabled bool
 }
 
-func newCGHandler(cg *ConsumerGroup, autoCommitEnabled bool) CGHandler {
+func newCGHandler(ctx context.Context, cg *ConsumerGroup, autoCommitEnabled bool) CGHandler {
 	return CGHandler{
+		ctx:               ctx,
 		Handles:           newTopicHandlerMap(),
 		autoCommitEnabled: autoCommitEnabled,
 		cg:                cg,
@@ -137,6 +139,21 @@ func (h CGHandler) Setup(sess sarama.ConsumerGroupSession) error {
 			h.cg.Metadata.Members[t][part] = sess.MemberID()
 		}
 	}
+	if !h.autoCommitEnabled {
+		go func() {
+			ticker := time.NewTicker(time.Second * 2)
+		commitLoop:
+			for {
+				select {
+				case <-h.ctx.Done():
+					sess.Commit()
+					break commitLoop
+				case <-ticker.C:
+					sess.Commit()
+				}
+			}
+		}()
+	}
 	return nil
 }
 
@@ -170,9 +187,6 @@ func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.C
 			sess.MarkMessage(msg, "")
 			currentOffset = msg.Offset
 			sess.MarkOffset(claim.Topic(), claim.Partition(), currentOffset+1, "")
-			if !h.autoCommitEnabled {
-				sess.Commit()
-			}
 		}
 	} else {
 		panic("No handler for given topic " + claim.Topic())
@@ -207,7 +221,7 @@ func NewConsumerGroup(ctx context.Context, addrs []string, groupID string, confi
 		consumer: group,
 		ctx:      ctx,
 	}
-	cg.handlers = newCGHandler(cg, config.Consumer.Offsets.AutoCommit.Enable)
+	cg.handlers = newCGHandler(ctx, cg, config.Consumer.Offsets.AutoCommit.Enable)
 	cg.Metadata = CGMeta{
 		Offsets: make(map[string]map[int32]int64),
 		Members: make(map[string]map[int32]string),
@@ -240,7 +254,7 @@ func (kc *KClient) NewConsumerGroup(ctx context.Context, groupID string, topics 
 		consumer: group,
 		ctx:      ctx,
 	}
-	cg.handlers = newCGHandler(cg, kc.config.Consumer.Offsets.AutoCommit.Enable)
+	cg.handlers = newCGHandler(ctx, cg, kc.config.Consumer.Offsets.AutoCommit.Enable)
 	cg.Metadata = CGMeta{
 		Offsets: make(map[string]map[int32]int64),
 		Members: make(map[string]map[int32]string),
