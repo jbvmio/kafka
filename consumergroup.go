@@ -105,10 +105,10 @@ func newCGHandler(ctx context.Context, cg *ConsumerGroup, autoCommitEnabled bool
 
 // ProcessMessageFunc is used to iterate over Messages.
 // Returns true for each Message if successful, false if not with optional error.
-type ProcessMessageFunc func(*Message) (bool, error)
+type ProcessMessageFunc func(*sarama.ConsumerMessage) (bool, error)
 
 // DefaultMessageFunc is default ProcessMessageFunc that can be used with a TopicHandlerMap.
-func DefaultMessageFunc(msg *Message) (bool, error) {
+func DefaultMessageFunc(msg *sarama.ConsumerMessage) (bool, error) {
 	if msg != nil {
 		fmt.Printf("Message topic:%q partition:%d offset:%d\n%s\n\n", msg.Topic, msg.Partition, msg.Offset, msg.Value)
 		return true, nil
@@ -180,7 +180,7 @@ func (h CGHandler) ConsumeClaim(sess sarama.ConsumerGroupSession, claim sarama.C
 	if ok {
 	ProcessMessages:
 		for msg := range claim.Messages() {
-			good, err = handleFunc(convertMsg(msg))
+			good, err = handleFunc(msg)
 			if !good {
 				break ProcessMessages
 			}

@@ -8,63 +8,24 @@ import (
 	"github.com/Shopify/sarama"
 )
 
-// ProducerError is the type of error generated when the producer fails to deliver a message.
-// It contains the original ProducerMessage as well as the actual error value.
-type ProducerError struct {
-	Msg *Message
-	Err error
-}
-
-func (e *ProducerError) toSarama() *sarama.ProducerError {
-	return &sarama.ProducerError{
-		Msg: e.Msg.toSarama(),
-		Err: e.Err,
-	}
-}
-
-func convertProducerErr(e *sarama.ProducerError) *ProducerError {
-	return &ProducerError{
-		Msg: convertProducerMsg(e.Msg),
-		Err: e.Err,
-	}
-}
-
-func convertProducerMsg(m *sarama.ProducerMessage) (msg *Message) {
-	k, _ := m.Key.Encode()
-	v, _ := m.Value.Encode()
-	return &Message{
-		Key:       k,
-		Value:     v,
-		Topic:     m.Topic,
-		Partition: m.Partition,
-		Offset:    m.Offset,
-		Timestamp: m.Timestamp,
-		Metadata:  m.Metadata,
-	}
-}
-
 // SendMSG sends a message to the targeted topic/partition defined in the message.
-func (kc *KClient) SendMSG(message *Message) (partition int32, offset int64, err error) {
+func (kc *KClient) SendMSG(message *sarama.ProducerMessage) (partition int32, offset int64, err error) {
 	producer, err := sarama.NewSyncProducerFromClient(kc.cl)
 	if err != nil {
 		return
 	}
-	partition, offset, err = producer.SendMessage(message.toSarama())
+	partition, offset, err = producer.SendMessage(message)
 	producer.Close()
 	return
 }
 
 // SendMessages sends groups of messages to the targeted topic/partition defined in each message.
-func (kc *KClient) SendMessages(messages []*Message) (err error) {
+func (kc *KClient) SendMessages(messages []*sarama.ProducerMessage) (err error) {
 	producer, err := sarama.NewSyncProducerFromClient(kc.cl)
 	if err != nil {
 		return
 	}
-	var msgs []*sarama.ProducerMessage
-	for _, message := range messages {
-		msgs = append(msgs, message.toSarama())
-	}
-	err = producer.SendMessages(msgs) //.SendMessage(message.toSarama())
+	err = producer.SendMessages(messages) //.SendMessage(message.toSarama())
 	producer.Close()
 	return
 }
@@ -74,8 +35,8 @@ type Producer struct {
 	producer         sarama.AsyncProducer
 	cl               *KClient
 	killChan         chan struct{}
-	errors           chan *ProducerError
-	input, successes chan *Message
+	errors           chan *sarama.ProducerError
+	input, successes chan *sarama.ProducerMessage
 	wg               sync.WaitGroup
 	noClose          bool
 }
@@ -102,9 +63,9 @@ func NewProducer(addrs []string, config *sarama.Config) (*Producer, error) {
 	producer.producer = p
 	producer.cl = kc
 	producer.killChan = make(chan struct{})
-	producer.errors = make(chan *ProducerError)
-	producer.input = make(chan *Message)
-	producer.successes = make(chan *Message)
+	producer.errors = make(chan *sarama.ProducerError)
+	producer.input = make(chan *sarama.ProducerMessage)
+	producer.successes = make(chan *sarama.ProducerMessage)
 	producer.wg = sync.WaitGroup{}
 	go producer.start()
 	return &producer, nil
@@ -127,9 +88,9 @@ func (kc *KClient) NewProducer() (*Producer, error) {
 		producer:  p,
 		cl:        kc,
 		killChan:  make(chan struct{}),
-		errors:    make(chan *ProducerError),
-		input:     make(chan *Message),
-		successes: make(chan *Message),
+		errors:    make(chan *sarama.ProducerError),
+		input:     make(chan *sarama.ProducerMessage),
+		successes: make(chan *sarama.ProducerMessage),
 		wg:        sync.WaitGroup{},
 		noClose:   true,
 	}
@@ -222,7 +183,7 @@ drainLoop:
 	for {
 		select {
 		case <-timer.C:
-			errd = fmt.Errorf("Timed out Draining Producer")
+			errd = fmt.Errorf("timed out draining producer")
 			break drainLoop
 		case <-doneChan:
 			done++
@@ -265,7 +226,7 @@ drainLoop:
 
 // Input is the input channel for the user to write messages to that they
 // wish to send.
-func (p *Producer) Input() chan<- *Message {
+func (p *Producer) Input() chan<- *sarama.ProducerMessage {
 	return p.input
 }
 
@@ -273,7 +234,7 @@ func (p *Producer) Input() chan<- *Message {
 // enabled. If Return.Successes is true, you MUST read from this channel or the
 // Producer will deadlock. It is suggested that you send and read messages
 // together in a single select statement.
-func (p *Producer) Successes() <-chan *Message {
+func (p *Producer) Successes() <-chan *sarama.ProducerMessage {
 	return p.successes
 }
 
@@ -281,7 +242,7 @@ func (p *Producer) Successes() <-chan *Message {
 // channel or the Producer will deadlock when the channel is full. Alternatively,
 // you can set Producer.Return.Errors in your config to false, which prevents
 // errors to be returned.
-func (p *Producer) Errors() <-chan *ProducerError {
+func (p *Producer) Errors() <-chan *sarama.ProducerError {
 	return p.errors
 }
 
@@ -291,14 +252,14 @@ func (p *Producer) start() {
 	go func() {
 		defer wg.Done()
 		for m := range p.producer.Errors() {
-			p.errors <- convertProducerErr(m)
+			p.errors <- m
 		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for m := range p.producer.Successes() {
-			p.successes <- convertProducerMsg(m)
+			p.successes <- m
 		}
 	}()
 inputLoop:
@@ -307,7 +268,7 @@ inputLoop:
 		case <-p.killChan:
 			break inputLoop
 		case m := <-p.input:
-			p.producer.Input() <- m.toSarama()
+			p.producer.Input() <- m
 		}
 	}
 	wg.Wait()

@@ -10,6 +10,7 @@ import (
 )
 
 // Message represents a Kafka message sent/received to/from a topic partition
+/*
 type Message struct {
 	Key, Value []byte
 	Topic      string
@@ -41,10 +42,11 @@ func (m *Message) toSarama() *sarama.ProducerMessage {
 		Metadata:  m.Metadata,
 	}
 }
+*/
 
-// BatchFetchMessages retrieves a batch of messages identified by a topic and partition offset map.
+// FetchBlocks retrieves a ResponseBlock of messages identified by a topic and partition offset map.
 // WIP* Do not use.
-func (kc *KClient) BatchFetchMessages(topic string, poMap map[int32][]int64) (messages []*Message, err error) {
+func (kc *KClient) FetchBlocks(topic string, poMap map[int32][]int64) (blocks map[int32]*sarama.FetchResponseBlock, err error) {
 	var response *sarama.FetchResponse
 	fetchRequest := sarama.FetchRequest{}
 
@@ -68,52 +70,22 @@ func (kc *KClient) BatchFetchMessages(topic string, poMap map[int32][]int64) (me
 		return
 	}
 	if response == nil {
-		err = fmt.Errorf("%v", "received nil response")
+		err = fmt.Errorf("received nil response")
 		return
 	}
 
-	blocks, ok := response.Blocks[topic]
+	var ok bool
+	blocks, ok = response.Blocks[topic]
 
-	if ok {
-		for part, block := range blocks {
-			for _, rs := range block.RecordsSet {
-				for _, msg := range rs.MsgSet.Messages {
-					messages = append(messages, &Message{
-						Topic:     topic,
-						Key:       msg.Msg.Key,
-						Value:     msg.Msg.Value,
-						Partition: part,
-						Offset:    msg.Offset,
-						Timestamp: msg.Msg.Timestamp,
-					})
-				}
-			}
-		}
+	if !ok {
+		err = fmt.Errorf("messages for %s not found", topic)
 	}
 	return
 }
 
 // ConsumeOffsetMsg retreives a single message from the given topic, partition and literal offset.
-func (kc *KClient) ConsumeOffsetMsg(topic string, partition int32, offset int64) (message *Message, err error) {
-	consumer, err := sarama.NewConsumerFromClient(kc.cl)
-	if err != nil {
-		return
-	}
-	partitionConsumer, err := consumer.ConsumePartition(topic, partition, offset)
-	if err != nil {
-		return
-	}
-	msg := <-partitionConsumer.Messages()
-	message = convertMsg(msg)
-	err = partitionConsumer.Close()
-	if err != nil {
-		return
-	}
-	err = consumer.Close()
-	if err != nil {
-		return
-	}
-	return
+func (kc *KClient) ConsumeOffsetMsg(topic string, partition int32, offset int64) (message *sarama.ConsumerMessage, err error) {
+	return kc.GetOffsetMsg(topic, partition, offset)
 }
 
 // GetOffsetMsg retreives a single message from the given topic, partition and literal offset without converstion.
@@ -142,7 +114,7 @@ func (kc *KClient) GetOffsetMsg(topic string, partition int32, offset int64) (me
 // Meant to be used via a goroutine, a Message channel needs to be created and be passed which is used to receive any messages.
 // Calling StopPartitionConsumers will stop all ChanPartitionConsume processes.
 // Any errors will be passed through the msgChan if received initializing the Consume Loop.
-func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset int64, msgChan chan *Message) {
+func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset int64, msgChan chan *sarama.ConsumerMessage) {
 	var stopNow bool
 	if kc.stopChan == nil {
 		kc.stopChan = make(chan none, 1)
@@ -150,7 +122,7 @@ func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset in
 	consumer, err := sarama.NewConsumerFromClient(kc.cl)
 	if err != nil {
 		errMsg := fmt.Sprintf("ERROR: %v", err)
-		msgChan <- &Message{
+		msgChan <- &sarama.ConsumerMessage{
 			Value: []byte(errMsg),
 		}
 		return
@@ -158,7 +130,7 @@ func (kc *KClient) ChanPartitionConsume(topic string, partition int32, offset in
 	partitionConsumer, err := consumer.ConsumePartition(topic, partition, offset)
 	if err != nil {
 		errMsg := fmt.Sprintf("ERROR: %v", err)
-		msgChan <- &Message{
+		msgChan <- &sarama.ConsumerMessage{
 			Value: []byte(errMsg),
 		}
 		return
@@ -170,7 +142,7 @@ ConsumeLoop:
 			stopNow = true
 			break ConsumeLoop
 		case msg := <-partitionConsumer.Messages():
-			msgChan <- convertMsg(msg)
+			msgChan <- msg
 			if stopNow {
 				break ConsumeLoop
 			}
@@ -198,7 +170,7 @@ func (kc *KClient) PartitionOffsetByTime(topic string, partition int32, time int
 
 // OffsetMsgByTime retreives a single message from the given topic, partition and reference time in UTC.
 // (datetime string Ex: "11/12/2018 03:59:38.508").
-func (kc *KClient) OffsetMsgByTime(topic string, partition int32, datetime string) (message *Message, err error) {
+func (kc *KClient) OffsetMsgByTime(topic string, partition int32, datetime string) (message *sarama.ConsumerMessage, err error) {
 	timeFormat := "01/02/2006 15:04:05.000"
 	targetTime := roundTime(datetime)
 	time, err := time.Parse(timeFormat, targetTime)
